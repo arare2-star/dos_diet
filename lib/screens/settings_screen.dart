@@ -5,9 +5,8 @@ import '../services/storage_service.dart';
 import '../services/notification_service.dart';
 import '../theme.dart';
 
-// TODO: HTMLをホスティング後、実際のURLに置き換えてください
-const String _privacyPolicyUrl = 'https://YOUR_DOMAIN/privacy_policy.html';
-const String _termsOfUseUrl = 'https://YOUR_DOMAIN/terms_of_use.html';
+const String _privacyPolicyUrl = 'https://arare2-star.github.io/dos_diet/privacy_policy.html';
+const String _termsOfUseUrl = 'https://arare2-star.github.io/dos_diet/terms_of_use.html';
 
 class SettingsScreen extends StatefulWidget {
   final StorageService storageService;
