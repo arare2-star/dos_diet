@@ -42,15 +42,30 @@ class HomeScreenState extends State<HomeScreen> {
   String _getPontaMessage() {
     final ratio = _todayCalories / _calorieGoal;
     if (_todayCalories == 0) {
-      return 'おはよう！今日も一緒にがんばろうね 🐾';
-    } else if (ratio < 0.5) {
-      return 'いい感じだよ！この調子！ 🐾';
+      return 'さっさと記録しろよ。始めないと意味ないぞ。';
+    } else if (ratio <= 0.5) {
+      return 'おっ、やるじゃないか！その調子で続けろよ！';
     } else if (ratio < 0.8) {
-      return '半分超えたね！残りも意識しよう 🐾';
+      return 'まあ悪くはない。油断すんなよ。';
     } else if (ratio < 1.0) {
-      return 'もう少しで目標だよ！気をつけてね 🐾';
+      return 'ギリギリだぞ。あと少し、踏ん張れ。';
+    } else if (ratio < 1.2) {
+      return 'オーバーしてるじゃないか。反省しろよ。';
     } else {
-      return '目標超えちゃった！明日また頑張ろう 🐾';
+      return 'はあ？食いすぎだろ。明日からやり直せ。';
+    }
+  }
+
+  String _getPontaImage() {
+    final ratio = _todayCalories / _calorieGoal;
+    if (_todayCalories == 0 || ratio <= 0.5) {
+      return 'assets/images/ponta_happy.png';
+    } else if (ratio < 1.0) {
+      return 'assets/images/ponta_default.png';
+    } else if (ratio < 1.3) {
+      return 'assets/images/ponta_shocked.png';
+    } else {
+      return 'assets/images/ponta_angry.png';
     }
   }
 
@@ -106,7 +121,7 @@ class HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Dos Diet',
+              'ぽんぽこ',
               style: GoogleFonts.nunito(
                 fontSize: 28,
                 fontWeight: FontWeight.w800,
@@ -136,7 +151,7 @@ class HomeScreenState extends State<HomeScreen> {
       ),
       child: Row(
         children: [
-          const Text('🐾', style: TextStyle(fontSize: 32)),
+          Image.asset(_getPontaImage(), width: 64, height: 64),
           const SizedBox(width: 12),
           Expanded(
             child: Text(

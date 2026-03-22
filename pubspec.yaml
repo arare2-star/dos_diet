@@ -1,5 +1,5 @@
-name: dos_diet
-description: "Dos Diet - あなたのダイエットをサポートするアプリ"
+name: ponpoko
+description: "辛口ダイエットコーチぽんぽこ - 厳しくもサポートするダイエットアプリ"
 publish_to: 'none'
 version: 1.0.1+2
 
@@ -16,6 +16,9 @@ dependencies:
   fl_chart: ^0.70.0
   intl: ^0.19.0
   url_launcher: ^6.2.0
+  http: ^1.6.0
+  image_picker: ^1.2.1
+  flutter_dotenv: ^6.0.0
 
 dev_dependencies:
   flutter_test:
@@ -24,3 +27,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - .env
+    - assets/images/ponta_default.png
+    - assets/images/ponta_happy.png
+    - assets/images/ponta_angry.png
+    - assets/images/ponta_shocked.png
