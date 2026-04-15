@@ -5,13 +5,20 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/storage_service.dart';
 import '../services/openai_service.dart';
+import '../services/subscription_service.dart';
+import '../screens/paywall_screen.dart';
 import '../models/food_entry.dart';
 import '../theme.dart';
 
 class FoodLogScreen extends StatefulWidget {
   final StorageService storageService;
+  final SubscriptionService subscriptionService;
 
-  const FoodLogScreen({super.key, required this.storageService});
+  const FoodLogScreen({
+    super.key,
+    required this.storageService,
+    required this.subscriptionService,
+  });
 
   @override
   State<FoodLogScreen> createState() => FoodLogScreenState();
@@ -56,7 +63,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
             CircularProgressIndicator(color: AppTheme.primary),
             SizedBox(height: 16),
             Text(
-              'ぽんたコーチが分析中... 🐾',
+              'ぽんぽこコーチが分析中だぽん... 🐾',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 14,
@@ -76,15 +83,9 @@ class FoodLogScreenState extends State<FoodLogScreen> {
       if (!mounted) return;
       Navigator.pop(context); // ローディングを閉じる
 
-      final totalToday = _entries.fold(0, (sum, e) => sum + e.calories);
-      final dailyGoal = widget.storageService.getCalorieGoal();
-      final feedback = OpenAIService.getPontaFeedback(
-        result.calories,
-        totalToday + result.calories,
-        dailyGoal,
-      );
-
-      _showScanResultDialog(result, feedback.message, feedback.imagePath, image.path);
+      // フィードバックはダイアログ内で食事タイプ選択と連動して計算するため、
+      // ここでは result と image.path だけ渡す
+      _showScanResultDialog(result, image.path);
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
@@ -97,154 +98,181 @@ class FoodLogScreenState extends State<FoodLogScreen> {
     }
   }
 
-  /// スキャン結果ダイアログ
-  void _showScanResultDialog(
-      CalorieResult result, String feedback, String pontaImagePath, String imagePath) {
+  /// スキャン結果ダイアログ（食事タイプ選択でフィードバックがリアルタイム更新）
+  void _showScanResultDialog(CalorieResult result, String imagePath) {
     String selectedType = 'lunch';
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: AppTheme.background,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(
-            'スキャン結果 📸',
-            style: GoogleFonts.nunito(
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 画像プレビュー
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(
-                    File(imagePath),
-                    height: 150,
-                    width: 280,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // 食べ物名
-                Text(
-                  result.foodName,
-                  style: GoogleFonts.nunito(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // カロリー
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${result.calories} kcal',
-                    style: GoogleFonts.nunito(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: AppTheme.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  result.description,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.nunito(
-                    fontSize: 13,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // ぽんたコーチフィードバック
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.secondary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Image.asset(
-                        pontaImagePath,
-                        width: 64,
-                        height: 64,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          feedback,
-                          style: GoogleFonts.nunito(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // 食事タイプ選択
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    _mealChip('breakfast', '朝食 🌅', selectedType,
-                        (val) => setDialogState(() => selectedType = val)),
-                    _mealChip('lunch', '昼食 ☀️', selectedType,
-                        (val) => setDialogState(() => selectedType = val)),
-                    _mealChip('dinner', '夕食 🌙', selectedType,
-                        (val) => setDialogState(() => selectedType = val)),
-                    _mealChip('snack', 'おやつ 🍪', selectedType,
-                        (val) => setDialogState(() => selectedType = val)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'キャンセル',
-                style: GoogleFonts.nunito(color: AppTheme.textSecondary),
+        builder: (context, setDialogState) {
+          // 食事タイプが変わるたびにフィードバックを再計算
+          final mealGoal = widget.storageService.getMealGoal(selectedType);
+          final feedback = OpenAIService.getPontaFeedback(
+            result.calories,
+            mealGoal,
+            selectedType,
+          );
+          // カロリーバーの色：目標オーバーなら警告色
+          final ratio = result.calories / mealGoal;
+          final calColor = ratio > 1.0 ? AppTheme.danger : AppTheme.primary;
+
+          return AlertDialog(
+            backgroundColor: AppTheme.background,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20)),
+            title: Text(
+              'スキャン結果 📸',
+              style: GoogleFonts.nunito(
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textPrimary,
               ),
             ),
-            ElevatedButton.icon(
-              onPressed: () async {
-                final entry = FoodEntry(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  name: result.foodName,
-                  calories: result.calories,
-                  type: selectedType,
-                  dateTime: _selectedDate,
-                );
-                await widget.storageService.addFoodEntry(entry);
-                refresh();
-                if (mounted) Navigator.pop(context);
-              },
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('記録する'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 画像プレビュー
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      File(imagePath),
+                      height: 150,
+                      width: 280,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // 食べ物名
+                  Text(
+                    result.foodName,
+                    style: GoogleFonts.nunito(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // カロリー（目標比で色が変わる）
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: calColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          '${result.calories} kcal',
+                          style: GoogleFonts.nunito(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: calColor,
+                          ),
+                        ),
+                        Text(
+                          '目標 $mealGoal kcal',
+                          style: GoogleFonts.nunito(
+                            fontSize: 11,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    result.description,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // ぽんぽこコーチフィードバック（食事タイプ連動）
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.secondary.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Image.asset(
+                          feedback.imagePath,
+                          width: 64,
+                          height: 64,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            feedback.message,
+                            style: GoogleFonts.nunito(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // 食事タイプ選択（タップでフィードバック即更新）
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _mealChip('breakfast', '朝食 🌅', selectedType,
+                          (val) => setDialogState(() => selectedType = val)),
+                      _mealChip('lunch', '昼食 ☀️', selectedType,
+                          (val) => setDialogState(() => selectedType = val)),
+                      _mealChip('dinner', '夕食 🌙', selectedType,
+                          (val) => setDialogState(() => selectedType = val)),
+                      _mealChip('snack', 'おやつ 🍪', selectedType,
+                          (val) => setDialogState(() => selectedType = val)),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'キャンセル',
+                  style: GoogleFonts.nunito(color: AppTheme.textSecondary),
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final entry = FoodEntry(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    name: result.foodName,
+                    calories: result.calories,
+                    type: selectedType,
+                    dateTime: _selectedDate,
+                  );
+                  await widget.storageService.addFoodEntry(entry);
+                  refresh();
+                  if (mounted) Navigator.pop(context);
+                },
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('記録する'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  void _showAddFoodDialog() {
+  Future<void> _showAddFoodDialog() async {
+    // サブスク確認（手動入力もカロリー記録機能のため有料）
+    final canUse = await _checkSubscriptionAndProceed();
+    if (!canUse || !mounted) return;
+
     final nameController = TextEditingController();
     final calorieController = TextEditingController();
     String selectedType = 'breakfast';
@@ -333,8 +361,59 @@ class FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  /// 📸 カメラ or ギャラリー選択シート
-  void _showImageSourceSheet() {
+  /// 💎 サブスク状態を確認してから処理を実行
+  Future<bool> _checkSubscriptionAndProceed() async {
+    final sub = widget.subscriptionService;
+    if (sub.canUseCalorieAnalysis) {
+      // トライアル中はバナーを表示
+      if (sub.status == SubscriptionStatus.trial) {
+        final daysLeft = sub.trialDaysRemaining;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'トライアル残り$daysLeft日だぽん！🐾',
+                style: GoogleFonts.nunito(),
+              ),
+              backgroundColor: AppTheme.secondary,
+              duration: const Duration(seconds: 2),
+              action: SnackBarAction(
+                label: 'プランを見る',
+                textColor: Colors.white,
+                onPressed: () => _showPaywall(),
+              ),
+            ),
+          );
+        }
+      }
+      return true;
+    }
+
+    // トライアル期限切れ → ペイウォールを表示
+    await _showPaywall();
+    return widget.subscriptionService.canUseCalorieAnalysis;
+  }
+
+  /// 💳 ペイウォール画面を開く
+  Future<void> _showPaywall() async {
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaywallScreen(
+          subscriptionService: widget.subscriptionService,
+        ),
+      ),
+    );
+    if (mounted) setState(() {}); // 購入後にUIを更新
+  }
+
+  /// 📸 カメラ or ギャラリー選択シート（サブスク確認付き）
+  Future<void> _showImageSourceSheet() async {
+    // まずサブスク状態を確認
+    final canUse = await _checkSubscriptionAndProceed();
+    if (!canUse || !mounted) return;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.background,
@@ -357,7 +436,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'ぽんたコーチがカロリーを推定するよ！',
+                'ぽんぽこコーチがカロリーを推定するぽん！',
                 style: GoogleFonts.nunito(
                   fontSize: 13,
                   color: AppTheme.textSecondary,
@@ -470,7 +549,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                       const Text('🐾', style: TextStyle(fontSize: 48)),
                       const SizedBox(height: 12),
                       Text(
-                        'まだ記録がないよ！\n食事を追加してね',
+                        'まだ記録がないぽん！\n食事を追加するぽん',
                         textAlign: TextAlign.center,
                         style: GoogleFonts.nunito(
                           fontSize: 14,
@@ -483,6 +562,15 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                         icon: const Icon(Icons.camera_alt, size: 18),
                         label: Text(
                           '写真でスキャン 📸',
+                          style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: _showAddFoodDialog,
+                        icon: const Icon(Icons.edit, size: 18),
+                        label: Text(
+                          '手動で追加',
                           style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
                         ),
                       ),

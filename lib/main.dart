@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'theme.dart';
 import 'services/storage_service.dart';
 import 'services/notification_service.dart';
+import 'services/subscription_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/food_log_screen.dart';
 import 'screens/stats_screen.dart';
@@ -18,13 +20,30 @@ void main() async {
   final storageService = StorageService();
   await storageService.init();
 
-  runApp(DosDietApp(storageService: storageService));
+  // サブスクリプションサービスを初期化
+  final subscriptionService = SubscriptionService();
+  await subscriptionService.init();
+
+  // 通知が有効な場合、アプリ起動時に再スケジュール（OS再起動等でリセットされるため）
+  if (storageService.getNotificationsEnabled()) {
+    await NotificationService.scheduleThreeDailyNotifications();
+  }
+
+  runApp(DosDietApp(
+    storageService: storageService,
+    subscriptionService: subscriptionService,
+  ));
 }
 
 class DosDietApp extends StatelessWidget {
   final StorageService storageService;
+  final SubscriptionService subscriptionService;
 
-  const DosDietApp({super.key, required this.storageService});
+  const DosDietApp({
+    super.key,
+    required this.storageService,
+    required this.subscriptionService,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -32,15 +51,35 @@ class DosDietApp extends StatelessWidget {
       title: 'Dos Diet',
       theme: AppTheme.theme,
       debugShowCheckedModeBanner: false,
-      home: MainScreen(storageService: storageService),
+      // 日本語ローカライズ設定
+      // これがないとiOSのカメラUI・テキスト操作メニュー等が英語になる
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('ja', 'JP'),
+        Locale('en', 'US'), // フォールバック用
+      ],
+      locale: const Locale('ja', 'JP'),
+      home: MainScreen(
+        storageService: storageService,
+        subscriptionService: subscriptionService,
+      ),
     );
   }
 }
 
 class MainScreen extends StatefulWidget {
   final StorageService storageService;
+  final SubscriptionService subscriptionService;
 
-  const MainScreen({super.key, required this.storageService});
+  const MainScreen({
+    super.key,
+    required this.storageService,
+    required this.subscriptionService,
+  });
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -67,6 +106,7 @@ class _MainScreenState extends State<MainScreen> {
       FoodLogScreen(
         key: _foodLogKey,
         storageService: widget.storageService,
+        subscriptionService: widget.subscriptionService,
       ),
       StatsScreen(
         key: _statsKey,
@@ -74,6 +114,7 @@ class _MainScreenState extends State<MainScreen> {
       ),
       SettingsScreen(
         storageService: widget.storageService,
+        subscriptionService: widget.subscriptionService,
       ),
     ];
 

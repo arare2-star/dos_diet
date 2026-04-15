@@ -69,46 +69,89 @@ class OpenAIService {
     throw Exception('カロリー推定に失敗しました (${response.statusCode})');
   }
 
-  /// ぽんたコーチからのフィードバックを生成（辛口キャラ）
-  static PontaFeedback getPontaFeedback(int calories, int totalToday, int dailyGoal) {
-    final remaining = dailyGoal - totalToday;
-    final ratio = totalToday / dailyGoal;
+  /// 食事タイプの日本語ラベルを返す
+  static String getMealLabel(String type) {
+    switch (type) {
+      case 'breakfast': return '朝食';
+      case 'lunch':     return '昼食';
+      case 'dinner':    return '夕食';
+      case 'snack':     return 'おやつ';
+      default:          return '食事';
+    }
+  }
 
-    if (ratio >= 1.5) {
-      return PontaFeedback(
-        message: 'はあ？！${totalToday}kcalって正気？\nもう今日は水だけ飲んどけ。',
-        imagePath: 'assets/images/ponta_angry.png',
-      );
+  /// ぽんぽこコーチからのフィードバックを生成（1食 vs 食事別目標）
+  static PontaFeedback getPontaFeedback(int mealCalories, int mealGoal, String mealType) {
+    final label = getMealLabel(mealType);
+    final over = mealCalories - mealGoal;
+    final under = mealGoal - mealCalories;
+    final ratio = mealCalories / mealGoal;
+
+    // ランダム性を出すためにカロリーの下一桁で分岐
+    final v = mealCalories % 3;
+
+    if (ratio >= 2.0) {
+      // 目標の2倍以上：草不可避レベル
+      final msgs = [
+        '${label}で${mealCalories}kcalwwwww\n絶対痩せる気ないぽんwww目標の2倍って何食ったんぽんwww',
+        '${mealCalories}kcalは草ぽんwwwww\nもうダイエットやめたほうが早いんじゃないかぽん？？www',
+        'え待って${mealCalories}kcalってマジぽん？wwww\n${over}kcalオーバーって清々しいくらい振り切れてるぽんwww',
+      ];
+      return PontaFeedback(message: msgs[v], imagePath: 'assets/images/ponta_angry.png');
+
+    } else if (ratio >= 1.5) {
+      // 目標の1.5倍以上：激怒
+      final msgs = [
+        'はあ？${label}で${mealCalories}kcalって正気ぽん？w\n目標${mealGoal}kcalを${over}kcalもオーバーしてて笑えないぽん。',
+        '${over}kcalオーバーwww\nぽんぽこ引いてるぽん…本当に痩せたいんかぽん？',
+        'そのカロリー見て何も思わないぽん？w\n${label}${mealCalories}kcalはちょっとありえないぽん。反省するぽん。',
+      ];
+      return PontaFeedback(message: msgs[v], imagePath: 'assets/images/ponta_angry.png');
+
     } else if (ratio >= 1.2) {
-      return PontaFeedback(
-        message: 'オーバーしてるじゃん。反省した？\n${(-remaining)}kcal食いすぎ。明日からちゃんとやれよ。',
-        imagePath: 'assets/images/ponta_shocked.png',
-      );
-    } else if (ratio >= 1.0) {
-      return PontaFeedback(
-        message: 'ギリギリアウトだ。\nあと少しで収まったのに…詰めが甘すぎ。',
-        imagePath: 'assets/images/ponta_shocked.png',
-      );
+      // 目標の1.2〜1.5倍：呆れ気味
+      final msgs = [
+        '${label}またオーバーしてるじゃないかぽんw\n${over}kcal多いぽん。まあ…想定内だけどさぽん。',
+        'うーん${mealCalories}kcalかぽん…\n目標より${over}kcalはみ出てるぽん。惜しいような惜しくないようなw',
+        'オーバーは×ぽん。でも${over}kcalくらいなら\n明日ちゃんとやれば帳消しにできるぽん。やれよぽんw',
+      ];
+      return PontaFeedback(message: msgs[v], imagePath: 'assets/images/ponta_shocked.png');
+
+    } else if (ratio > 1.0) {
+      // 目標をちょいオーバー：ため息系
+      final msgs = [
+        'あとちょっとだったぽんw\n${over}kcalはみ出てるぽん。詰めが甘いんだよなぽん。',
+        'ギリアウトぽん…w\nあと${over}kcal我慢できなかったぽん？惜しすぎるぽん。',
+        'もうちょいだったのに〜ぽんw\n${over}kcalオーバー。次は絶対収めるぽん、いいかぽん？',
+      ];
+      return PontaFeedback(message: msgs[v], imagePath: 'assets/images/ponta_shocked.png');
+
     } else if (ratio >= 0.8) {
-      return PontaFeedback(
-        message: 'まあ…悪くはないけど。\nあと${remaining}kcalは残ってるぞ。油断すんな。',
-        imagePath: 'assets/images/ponta_default.png',
-      );
-    } else if (calories > 700) {
-      return PontaFeedback(
-        message: 'その一食でかなり使ったな。\n次は軽めにしろよ。わかった？',
-        imagePath: 'assets/images/ponta_default.png',
-      );
-    } else if (ratio <= 0.5) {
-      return PontaFeedback(
-        message: 'おっ、今日はやるじゃん！🎉\n${remaining}kcalも余ってる！その調子で続けろよ！',
-        imagePath: 'assets/images/ponta_happy.png',
-      );
+      // 目標の8〜10割：合格
+      final msgs = [
+        '${label}は合格ぽん👏\nちゃんと目標以内に収まったぽん。えらいじゃないかぽん。',
+        'おっ、ちゃんとやるじゃないかぽん。\n${label}${mealCalories}kcal、合格ぽん！この調子ぽん。',
+        '悪くないぽん。\n目標${mealGoal}kcalに対して${mealCalories}kcalはセーフぽん。毎回これでいくぽん。',
+      ];
+      return PontaFeedback(message: msgs[v], imagePath: 'assets/images/ponta_default.png');
+
+    } else if (ratio >= 0.5) {
+      // 目標の5〜8割：褒め
+      final msgs = [
+        'おお、${label}余裕で収まったぽん！🎉\n目標より${under}kcal少ないぽん。やればできるじゃないかぽん！',
+        '${mealCalories}kcalはなかなかいいぽん！\nこれを毎回続けるぽん。逃げんなよぽんw',
+        'いいじゃないかぽん〜！\n${label}${under}kcalも余ったぽん。ぽんぽこ的に合格以上ぽん👍',
+      ];
+      return PontaFeedback(message: msgs[v], imagePath: 'assets/images/ponta_happy.png');
+
     } else {
-      return PontaFeedback(
-        message: 'ちゃんと記録できてるじゃないか。\nこれを毎日続けろよ。逃げるなよ。',
-        imagePath: 'assets/images/ponta_default.png',
-      );
+      // 目標の半分以下：少なすぎ注意
+      final msgs = [
+        '${label}${mealCalories}kcalって少なすぎぽん…\nダイエットは飢えればいいってもんじゃないぽん。ちゃんと食べるぽん。',
+        'え、それだけ？w\n栄養足りてるぽん？無理な食事制限は続かないぽんよ。',
+        'ストイックすぎて逆に心配ぽん。\n${label}${mealCalories}kcalはさすがに少ないぽん。食べるべきものは食べるぽん。',
+      ];
+      return PontaFeedback(message: msgs[v], imagePath: 'assets/images/ponta_default.png');
     }
   }
 }

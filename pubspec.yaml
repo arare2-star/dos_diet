@@ -1,7 +1,7 @@
 name: ponpoko
 description: "辛口ダイエットコーチぽんぽこ - 厳しくもサポートするダイエットアプリ"
 publish_to: 'none'
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: ^3.10.7
@@ -9,16 +9,21 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: ^1.0.8
   flutter_local_notifications: ^19.0.0
   shared_preferences: ^2.3.0
   google_fonts: ^6.2.0
   fl_chart: ^0.70.0
-  intl: ^0.19.0
+  intl: ^0.20.0
   url_launcher: ^6.2.0
   http: ^1.6.0
   image_picker: ^1.2.1
   flutter_dotenv: ^6.0.0
+  timezone: ^0.10.1
+  flutter_timezone: ^1.0.4
+  in_app_purchase: ^3.2.0
 
 dev_dependencies:
   flutter_test:

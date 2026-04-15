@@ -42,17 +42,17 @@ class HomeScreenState extends State<HomeScreen> {
   String _getPontaMessage() {
     final ratio = _todayCalories / _calorieGoal;
     if (_todayCalories == 0) {
-      return 'さっさと記録しろよ。始めないと意味ないぞ。';
+      return 'さっさと記録するぽん。始めないと意味ないぽん。';
     } else if (ratio <= 0.5) {
-      return 'おっ、やるじゃないか！その調子で続けろよ！';
+      return 'おっ、やるじゃないかぽん！その調子で続けるぽん！';
     } else if (ratio < 0.8) {
-      return 'まあ悪くはない。油断すんなよ。';
+      return 'まあ悪くはないぽん。油断すんなよぽん。';
     } else if (ratio < 1.0) {
-      return 'ギリギリだぞ。あと少し、踏ん張れ。';
+      return 'ギリギリだぽん。あと少し、踏ん張るぽん。';
     } else if (ratio < 1.2) {
-      return 'オーバーしてるじゃないか。反省しろよ。';
+      return 'オーバーしてるじゃないかぽん。反省するぽん。';
     } else {
-      return 'はあ？食いすぎだろ。明日からやり直せ。';
+      return 'はあ？食いすぎだぽん。明日からやり直すぽん。';
     }
   }
 

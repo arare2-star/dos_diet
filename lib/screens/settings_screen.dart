@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/storage_service.dart';
 import '../services/notification_service.dart';
+import '../services/subscription_service.dart';
+import '../screens/paywall_screen.dart';
 import '../theme.dart';
 
 const String _privacyPolicyUrl = 'https://arare2-star.github.io/dos_diet/privacy_policy.html';
@@ -10,15 +12,25 @@ const String _termsOfUseUrl = 'https://arare2-star.github.io/dos_diet/terms_of_u
 
 class SettingsScreen extends StatefulWidget {
   final StorageService storageService;
+  final SubscriptionService subscriptionService;
 
-  const SettingsScreen({super.key, required this.storageService});
+  const SettingsScreen({
+    super.key,
+    required this.storageService,
+    required this.subscriptionService,
+  });
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late int _calorieGoal;
+  // 食事別カロリー目標
+  late int _breakfastGoal;
+  late int _lunchGoal;
+  late int _dinnerGoal;
+  late int _snackGoal;
+
   late bool _notificationsEnabled;
   late int _notificationHour;
   late int _notificationMinute;
@@ -26,7 +38,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _calorieGoal = widget.storageService.getCalorieGoal();
+    _breakfastGoal = widget.storageService.getBreakfastGoal();
+    _lunchGoal     = widget.storageService.getLunchGoal();
+    _dinnerGoal    = widget.storageService.getDinnerGoal();
+    _snackGoal     = widget.storageService.getSnackGoal();
     _notificationsEnabled = widget.storageService.getNotificationsEnabled();
     _notificationHour = widget.storageService.getNotificationHour();
     _notificationMinute = widget.storageService.getNotificationMinute();
@@ -43,14 +58,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 💎 プレミアムセクション（最上部に配置）
+                _buildPremiumSection(),
+                const SizedBox(height: 20),
                 _buildSection(
-                  '目標設定',
+                  '食事別カロリー目標 🎯',
                   Icons.track_changes,
-                  [_buildCalorieGoalTile()],
+                  [
+                    _buildMealGoalTile('breakfast', '朝食 🌅', _breakfastGoal),
+                    _buildMealGoalTile('lunch',     '昼食 ☀️', _lunchGoal),
+                    _buildMealGoalTile('dinner',    '夕食 🌙', _dinnerGoal),
+                    _buildMealGoalTile('snack',     'おやつ 🍪', _snackGoal),
+                    _buildTotalCalorieTile(),
+                  ],
                 ),
                 const SizedBox(height: 20),
                 _buildSection(
-                  'ぽんたコーチ通知 🐾',
+                  'ぽんぽこコーチ通知 🐾',
                   Icons.notifications_active,
                   [
                     _buildNotificationToggle(),
@@ -114,6 +138,202 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// 💎 プレミアムセクション
+  Widget _buildPremiumSection() {
+    final sub = widget.subscriptionService;
+    final status = sub.status;
+
+    // 有効なサブスク
+    if (status == SubscriptionStatus.active) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppTheme.primary, AppTheme.secondary],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primary.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Text('👑', style: TextStyle(fontSize: 32)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'プレミアム会員',
+                    style: GoogleFonts.nunito(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    'すべての機能が使えるぽん！🐾',
+                    style: GoogleFonts.nunito(
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                await sub.restorePurchases();
+                if (mounted) setState(() {});
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+              ),
+              child: Text(
+                '復元',
+                style: GoogleFonts.nunito(fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // トライアル中
+    if (status == SubscriptionStatus.trial) {
+      final daysLeft = sub.trialDaysRemaining;
+      return GestureDetector(
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PaywallScreen(
+                subscriptionService: widget.subscriptionService,
+              ),
+            ),
+          );
+          if (mounted) setState(() {});
+        },
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Text('🎁', style: TextStyle(fontSize: 32)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'トライアル中（残り$daysLeft日）',
+                      style: GoogleFonts.nunito(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      'タップしてプレミアムにアップグレード',
+                      style: GoogleFonts.nunito(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.white),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // トライアル期限切れ（未購入）
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PaywallScreen(
+              subscriptionService: widget.subscriptionService,
+            ),
+          ),
+        );
+        if (mounted) setState(() {});
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppTheme.primary.withValues(alpha: 0.3),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primary.withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Text('💎', style: TextStyle(fontSize: 32)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'プレミアムにアップグレード',
+                    style: GoogleFonts.nunito(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                  Text(
+                    'AI写真スキャンを使うには月額¥390から',
+                    style: GoogleFonts.nunito(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppTheme.primary),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSection(String title, IconData icon, List<Widget> children) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,11 +392,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildCalorieGoalTile() {
+  /// 食事別カロリー目標タイル（各食事をタップで編集）
+  Widget _buildMealGoalTile(String type, String label, int currentGoal) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       title: Text(
-        'カロリー目標',
+        label,
         style: GoogleFonts.nunito(
           fontSize: 15,
           fontWeight: FontWeight.w600,
@@ -184,14 +405,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
       subtitle: Text(
-        '$_calorieGoal kcal / 日',
+        '$currentGoal kcal',
         style: GoogleFonts.nunito(
           fontSize: 13,
           color: AppTheme.textSecondary,
         ),
       ),
       trailing: const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
-      onTap: _showCalorieGoalDialog,
+      onTap: () => _showMealGoalDialog(type, label, currentGoal),
+    );
+  }
+
+  /// 合計カロリー表示タイル（読み取り専用）
+  Widget _buildTotalCalorieTile() {
+    final total = _breakfastGoal + _lunchGoal + _dinnerGoal + _snackGoal;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      title: Text(
+        '1日合計',
+        style: GoogleFonts.nunito(
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          color: AppTheme.primary,
+        ),
+      ),
+      trailing: Text(
+        '$total kcal',
+        style: GoogleFonts.nunito(
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+          color: AppTheme.primary,
+        ),
+      ),
     );
   }
 
@@ -213,18 +458,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await widget.storageService.setNotificationsEnabled(value);
         if (value) {
           await NotificationService.requestPermissions();
+          await NotificationService.scheduleThreeDailyNotifications();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '通知をオンにしたよ！8:00・12:00・19:00に届くぞ 🐾',
+                  style: GoogleFonts.nunito(),
+                ),
+                backgroundColor: AppTheme.primary,
+              ),
+            );
+          }
+        } else {
+          await NotificationService.cancelAllNotifications();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '通知をオフにしたよ 🐾',
+                  style: GoogleFonts.nunito(),
+                ),
+                backgroundColor: AppTheme.textSecondary,
+              ),
+            );
+          }
         }
       },
     );
   }
 
   Widget _buildNotificationTimeTile() {
-    final timeStr =
-        '${_notificationHour.toString().padLeft(2, '0')}:${_notificationMinute.toString().padLeft(2, '0')}';
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: const Text('🕐', style: TextStyle(fontSize: 20)),
       title: Text(
-        '通知時間',
+        '通知時間（固定）',
         style: GoogleFonts.nunito(
           fontSize: 15,
           fontWeight: FontWeight.w600,
@@ -232,32 +501,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
       subtitle: Text(
-        timeStr,
+        '8:00（朝食）・12:00（昼食）・19:00（夕食）',
         style: GoogleFonts.nunito(
           fontSize: 13,
           color: AppTheme.textSecondary,
         ),
       ),
-      trailing: const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
-      onTap: () async {
-        final time = await showTimePicker(
-          context: context,
-          initialTime: TimeOfDay(
-            hour: _notificationHour,
-            minute: _notificationMinute,
-          ),
-        );
-        if (time != null) {
-          setState(() {
-            _notificationHour = time.hour;
-            _notificationMinute = time.minute;
-          });
-          await widget.storageService.setNotificationTime(
-            time.hour,
-            time.minute,
-          );
-        }
-      },
     );
   }
 
@@ -282,7 +531,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'ぽんたコーチから通知を送ったよ！ 🐾',
+                'ぽんぽこコーチから通知を送ったよ！ 🐾',
                 style: GoogleFonts.nunito(),
               ),
               backgroundColor: AppTheme.primary,
@@ -337,15 +586,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showCalorieGoalDialog() {
-    final controller = TextEditingController(text: _calorieGoal.toString());
+  /// 食事別カロリー目標ダイアログ
+  void _showMealGoalDialog(String type, String label, int currentGoal) {
+    final controller = TextEditingController(text: currentGoal.toString());
+
+    // 食事タイプ別のクイック選択値とヒントテキスト
+    final Map<String, List<int>> quickValues = {
+      'breakfast': [300, 400, 500, 600],
+      'lunch':     [500, 600, 700, 800],
+      'dinner':    [400, 500, 600, 700],
+      'snack':     [100, 150, 200, 300],
+    };
+    final Map<String, String> hints = {
+      'breakfast': '朝食はしっかり食べてOKぽん！',
+      'lunch':     '昼食は1日の中心ぽん！',
+      'dinner':    '夕食は控えめが理想ぽん！',
+      'snack':     'おやつは少なめにするぽん！',
+    };
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.background,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-          'カロリー目標',
+          '$label の目標',
           style: GoogleFonts.nunito(
             fontWeight: FontWeight.w700,
             color: AppTheme.textPrimary,
@@ -355,7 +620,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '1日の目標摂取カロリーを設定',
+              hints[type] ?? 'カロリー目標を設定するぽん',
               style: GoogleFonts.nunito(
                 fontSize: 13,
                 color: AppTheme.textSecondary,
@@ -379,7 +644,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
-              children: [1500, 1800, 2000, 2500].map((value) {
+              children: (quickValues[type] ?? [300, 500, 700]).map((value) {
                 return ActionChip(
                   label: Text(
                     '$value',
@@ -389,9 +654,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   backgroundColor: AppTheme.surface,
-                  onPressed: () {
-                    controller.text = value.toString();
-                  },
+                  onPressed: () => controller.text = value.toString(),
                 );
               }).toList(),
             ),
@@ -409,8 +672,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () async {
               final value = int.tryParse(controller.text);
               if (value != null && value > 0) {
-                setState(() => _calorieGoal = value);
-                await widget.storageService.setCalorieGoal(value);
+                await widget.storageService.setMealGoal(type, value);
+                setState(() {
+                  switch (type) {
+                    case 'breakfast': _breakfastGoal = value; break;
+                    case 'lunch':     _lunchGoal     = value; break;
+                    case 'dinner':    _dinnerGoal    = value; break;
+                    case 'snack':     _snackGoal     = value; break;
+                  }
+                });
                 if (mounted) Navigator.pop(context);
               }
             },
