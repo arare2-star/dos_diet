@@ -44,3 +44,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 .env
+
+# Autosave task artifacts (not app code)
+.autosave_staging/
+autosave-report-*.md
