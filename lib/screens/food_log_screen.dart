@@ -9,6 +9,9 @@ import '../services/subscription_service.dart';
 import '../screens/paywall_screen.dart';
 import '../models/food_entry.dart';
 import '../theme.dart';
+import '../services/notification_service.dart';
+import '../widgets/slot_jackpot.dart';
+import '../widgets/ui.dart';
 
 class FoodLogScreen extends StatefulWidget {
   final StorageService storageService;
@@ -40,6 +43,29 @@ class FoodLogScreenState extends State<FoodLogScreen> {
     setState(() {
       _entries = widget.storageService.getFoodEntriesForDate(_selectedDate);
     });
+  }
+
+  /// 🎰 記録を保存してダイアログを閉じ、当たり条件を満たせばスロット演出を出す
+  Future<void> _saveEntry(FoodEntry entry, BuildContext dialogContext) async {
+    await widget.storageService.addFoodEntry(entry);
+    refresh();
+    // 今日の通知文面を最新の記録状態で組み直す
+    NotificationService.reschedule(widget.storageService);
+
+    final dayTotal = widget.storageService
+        .getFoodEntriesForDate(_selectedDate)
+        .fold(0, (sum, e) => sum + e.calories);
+    final trigger = SlotTrigger.check(
+      entryCalories: entry.calories,
+      mealType: entry.type,
+      dayTotal: dayTotal,
+      dailyGoal: widget.storageService.getCalorieGoal(),
+    );
+
+    if (dialogContext.mounted) Navigator.pop(dialogContext);
+    if (trigger != null && mounted) {
+      await showSlotOverlay(context, trigger);
+    }
   }
 
   /// 📸 画像からカロリーを推定してダイアログを表示
@@ -224,14 +250,9 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                   Wrap(
                     spacing: 8,
                     children: [
-                      _mealChip('breakfast', '朝食 🌅', selectedType,
-                          (val) => setDialogState(() => selectedType = val)),
-                      _mealChip('lunch', '昼食 ☀️', selectedType,
-                          (val) => setDialogState(() => selectedType = val)),
-                      _mealChip('dinner', '夕食 🌙', selectedType,
-                          (val) => setDialogState(() => selectedType = val)),
-                      _mealChip('snack', 'おやつ 🍪', selectedType,
-                          (val) => setDialogState(() => selectedType = val)),
+                      for (final type in MealMeta.byType.keys)
+                        _mealChip(type, selectedType,
+                            (val) => setDialogState(() => selectedType = val)),
                     ],
                   ),
                 ],
@@ -246,7 +267,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                 ),
               ),
               ElevatedButton.icon(
-                onPressed: () async {
+                onPressed: () {
                   final entry = FoodEntry(
                     id: DateTime.now().millisecondsSinceEpoch.toString(),
                     name: result.foodName,
@@ -254,9 +275,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                     type: selectedType,
                     dateTime: _selectedDate,
                   );
-                  await widget.storageService.addFoodEntry(entry);
-                  refresh();
-                  if (mounted) Navigator.pop(context);
+                  _saveEntry(entry, context);
                 },
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('記録する'),
@@ -315,14 +334,9 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                 Wrap(
                   spacing: 8,
                   children: [
-                    _mealChip('breakfast', '朝食 🌅', selectedType,
-                        (val) => setDialogState(() => selectedType = val)),
-                    _mealChip('lunch', '昼食 ☀️', selectedType,
-                        (val) => setDialogState(() => selectedType = val)),
-                    _mealChip('dinner', '夕食 🌙', selectedType,
-                        (val) => setDialogState(() => selectedType = val)),
-                    _mealChip('snack', 'おやつ 🍪', selectedType,
-                        (val) => setDialogState(() => selectedType = val)),
+                    for (final type in MealMeta.byType.keys)
+                      _mealChip(type, selectedType,
+                          (val) => setDialogState(() => selectedType = val)),
                   ],
                 ),
               ],
@@ -337,7 +351,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
               ),
             ),
             ElevatedButton(
-              onPressed: () async {
+              onPressed: () {
                 final name = nameController.text.trim();
                 final calories = int.tryParse(calorieController.text);
                 if (name.isNotEmpty && calories != null && calories > 0) {
@@ -348,9 +362,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                     type: selectedType,
                     dateTime: _selectedDate,
                   );
-                  await widget.storageService.addFoodEntry(entry);
-                  refresh();
-                  if (mounted) Navigator.pop(context);
+                  _saveEntry(entry, context);
                 }
               },
               child: const Text('追加'),
@@ -479,20 +491,33 @@ class FoodLogScreenState extends State<FoodLogScreen> {
     );
   }
 
-  Widget _mealChip(
-      String value, String label, String selected, Function(String) onSelect) {
+  Widget _mealChip(String value, String selected, Function(String) onSelect) {
     final isSelected = value == selected;
+    final meta = MealMeta.of(value);
     return ChoiceChip(
+      avatar: Icon(
+        meta.icon,
+        size: 16,
+        color: isSelected ? Colors.white : meta.color,
+      ),
       label: Text(
-        label,
+        meta.label,
         style: GoogleFonts.nunito(
           fontSize: 12,
+          fontWeight: FontWeight.w700,
           color: isSelected ? Colors.white : AppTheme.textPrimary,
         ),
       ),
       selected: isSelected,
-      selectedColor: AppTheme.primary,
+      showCheckmark: false,
+      selectedColor: meta.color,
       backgroundColor: AppTheme.surface,
+      side: BorderSide(
+        color: isSelected
+            ? Colors.transparent
+            : AppTheme.primary.withValues(alpha: 0.15),
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       onSelected: (_) => onSelect(value),
     );
   }
@@ -546,7 +571,11 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('🐾', style: TextStyle(fontSize: 48)),
+                      Image.asset(
+                        'assets/images/ponta_default.png',
+                        width: 110,
+                        height: 110,
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         'まだ記録がないぽん！\n食事を追加するぽん',
@@ -578,7 +607,8 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  // 下端はFABに隠れないよう余白を取る
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
                   itemCount: _entries.length,
                   itemBuilder: (context, index) {
                     final entry = _entries[index];
@@ -591,28 +621,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
   }
 
   Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
-      decoration: BoxDecoration(
-        gradient: AppTheme.headerGradient,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Text(
-          '食事記録',
-          style: GoogleFonts.nunito(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
+    return GradientHeader(title: '食事記録');
   }
 
   Widget _buildDateSelector(String dateStr) {
@@ -654,12 +663,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
   }
 
   Widget _buildEntryCard(FoodEntry entry) {
-    final mealIcons = {
-      'breakfast': '🌅',
-      'lunch': '☀️',
-      'dinner': '🌙',
-      'snack': '🍪',
-    };
+    final meta = MealMeta.of(entry.type);
 
     return Dismissible(
       key: Key(entry.id),
@@ -667,37 +671,36 @@ class FoodLogScreenState extends State<FoodLogScreen> {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        margin: const EdgeInsets.only(bottom: 8),
+        margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
           color: AppTheme.danger,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: const Icon(Icons.delete, color: Colors.white),
+        child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
       ),
       onDismissed: (_) async {
         await widget.storageService.removeFoodEntry(entry.id);
         refresh();
+        NotificationService.reschedule(widget.storageService);
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: AppTheme.cardColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.08)),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primary.withValues(alpha: 0.06),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
+              color: AppTheme.primary.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(
           children: [
-            Text(
-              mealIcons[entry.type] ?? '🍽️',
-              style: const TextStyle(fontSize: 24),
-            ),
+            MealIcon(type: entry.type, size: 42),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -707,19 +710,40 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                     entry.name,
                     style: GoogleFonts.nunito(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    meta.label,
+                    style: GoogleFonts.nunito(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
                     ),
                   ),
                 ],
               ),
             ),
-            Text(
-              '${entry.calories} kcal',
-              style: GoogleFonts.nunito(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.primary,
+            Text.rich(
+              TextSpan(
+                text: '${entry.calories}',
+                style: GoogleFonts.nunito(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimary,
+                ),
+                children: [
+                  TextSpan(
+                    text: ' kcal',
+                    style: GoogleFonts.nunito(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

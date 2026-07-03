@@ -238,9 +238,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   Widget _buildFeatureCard() {
     const features = [
-      ('📸', 'AI写真スキャン', '食べ物を撮るだけでカロリーを自動推定'),
-      ('🐾', 'ぽんぽこコーチ', '辛口コーチが毎日サポートしてくれるぽん'),
-      ('📊', '詳細統計', '食事の傾向をグラフで確認'),
+      (Icons.camera_alt_rounded, Color(0xFFFF7043), 'AI写真スキャン', '食べ物を撮るだけでカロリーを自動推定'),
+      (Icons.pets_rounded, Color(0xFF8D6E63), 'ぽんぽこコーチ', '辛口コーチが毎日サポートしてくれるぽん'),
+      (Icons.insights_rounded, Color(0xFF9575CD), '詳細統計', '食事の傾向をグラフで確認'),
     ];
 
     return Container(
@@ -248,12 +248,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primary.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: AppTheme.primary.withValues(alpha: 0.10),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -263,14 +264,22 @@ class _PaywallScreenState extends State<PaywallScreen> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               children: [
-                Text(f.$1, style: const TextStyle(fontSize: 28)),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: f.$2.withValues(alpha: 0.14),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(f.$1, color: f.$2, size: 20),
+                ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(f.$2, style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                      Text(f.$3, style: GoogleFonts.nunito(fontSize: 12, color: AppTheme.textSecondary)),
+                      Text(f.$3, style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                      Text(f.$4, style: GoogleFonts.nunito(fontSize: 12, color: AppTheme.textSecondary)),
                     ],
                   ),
                 ),

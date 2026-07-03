@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -59,7 +60,7 @@ class OpenAIService {
         final parsed = jsonDecode(jsonMatch.group(0)!);
         return CalorieResult(
           foodName: parsed['food_name'] ?? '不明な食べ物',
-          calories: (parsed['calories'] as num?)?.toInt() ?? 0,
+          calories: _dejitterRound((parsed['calories'] as num?)?.toInt() ?? 0),
           description: parsed['description'] ?? '',
           confidence: parsed['confidence'] ?? 'low',
         );
@@ -67,6 +68,15 @@ class OpenAIService {
     }
 
     throw Exception('カロリー推定に失敗しました (${response.statusCode})');
+  }
+
+  /// AIの推定値はほぼ必ずキリのいい数字（10・50の倍数）で返ってくるため、
+  /// 一桁台にゆらぎを入れて実測っぽい粒度にする（もともと±20%程度の概算なので精度は落ちない）。
+  /// これでスロット演出のゾロ目・777がスキャン経由でも現実的に出るようになる
+  static int _dejitterRound(int calories) {
+    if (calories < 30 || calories % 5 != 0) return calories; // 元から端数ならそのまま
+    final jittered = calories + Random().nextInt(15) - 7; // ±7
+    return jittered < 1 ? calories : jittered;
   }
 
   /// 食事タイプの日本語ラベルを返す

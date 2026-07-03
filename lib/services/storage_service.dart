@@ -211,4 +211,35 @@ class StorageService {
     final entries = getFoodEntriesForDate(date);
     return entries.fold(0, (sum, e) => sum + e.calories);
   }
+
+  // Streak（連続記録日数）
+
+  /// 連続記録日数。今日が未記録でも昨日まで続いていれば維持扱い（まだ途切れていない）
+  int getStreakDays() {
+    final recorded = getFoodEntries()
+        .map((e) => DateTime(e.dateTime.year, e.dateTime.month, e.dateTime.day))
+        .toSet();
+    final now = DateTime.now();
+    var day = DateTime(now.year, now.month, now.day);
+    if (!recorded.contains(day)) {
+      day = day.subtract(const Duration(days: 1));
+    }
+    var streak = 0;
+    while (recorded.contains(day)) {
+      streak++;
+      day = day.subtract(const Duration(days: 1));
+    }
+    return streak;
+  }
+
+  /// 今週（月〜日）の各曜日に記録があるか
+  List<bool> getRecordedThisWeek() {
+    final now = DateTime.now();
+    final monday = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - 1));
+    return [
+      for (var i = 0; i < 7; i++)
+        getFoodEntriesForDate(monday.add(Duration(days: i))).isNotEmpty,
+    ];
+  }
 }

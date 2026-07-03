@@ -10,6 +10,7 @@ import 'screens/home_screen.dart';
 import 'screens/food_log_screen.dart';
 import 'screens/stats_screen.dart';
 import 'screens/settings_screen.dart';
+import 'widgets/mini_tanuki.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,10 +25,8 @@ void main() async {
   final subscriptionService = SubscriptionService();
   await subscriptionService.init();
 
-  // 通知が有効な場合、アプリ起動時に再スケジュール（OS再起動等でリセットされるため）
-  if (storageService.getNotificationsEnabled()) {
-    await NotificationService.scheduleThreeDailyNotifications();
-  }
+  // アプリ起動時に現在の記録状態で通知を組み直す（無効時はreschedule内で何もしない）
+  await NotificationService.reschedule(storageService);
 
   runApp(DosDietApp(
     storageService: storageService,
@@ -145,9 +144,15 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _currentIndex,
+            children: _screens,
+          ),
+          // 🦝 ドット絵ミニたぬき（最前面。本体以外はタッチ素通し）
+          const Positioned.fill(child: MiniTanukiLayer()),
+        ],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

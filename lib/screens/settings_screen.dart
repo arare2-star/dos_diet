@@ -6,6 +6,7 @@ import '../services/notification_service.dart';
 import '../services/subscription_service.dart';
 import '../screens/paywall_screen.dart';
 import '../theme.dart';
+import '../widgets/ui.dart';
 
 const String _privacyPolicyUrl = 'https://arare2-star.github.io/dos_diet/privacy_policy.html';
 const String _termsOfUseUrl = 'https://arare2-star.github.io/dos_diet/terms_of_use.html';
@@ -54,7 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           _buildHeader(),
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -62,19 +63,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _buildPremiumSection(),
                 const SizedBox(height: 20),
                 _buildSection(
-                  '食事別カロリー目標 🎯',
+                  '食事別カロリー目標',
                   Icons.track_changes,
                   [
-                    _buildMealGoalTile('breakfast', '朝食 🌅', _breakfastGoal),
-                    _buildMealGoalTile('lunch',     '昼食 ☀️', _lunchGoal),
-                    _buildMealGoalTile('dinner',    '夕食 🌙', _dinnerGoal),
-                    _buildMealGoalTile('snack',     'おやつ 🍪', _snackGoal),
+                    _buildMealGoalTile('breakfast', _breakfastGoal),
+                    _buildMealGoalTile('lunch', _lunchGoal),
+                    _buildMealGoalTile('dinner', _dinnerGoal),
+                    _buildMealGoalTile('snack', _snackGoal),
                     _buildTotalCalorieTile(),
                   ],
                 ),
                 const SizedBox(height: 20),
                 _buildSection(
-                  'ぽんぽこコーチ通知 🐾',
+                  'ぽんぽこコーチ通知',
                   Icons.notifications_active,
                   [
                     _buildNotificationToggle(),
@@ -114,28 +115,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
-      decoration: BoxDecoration(
-        gradient: AppTheme.headerGradient,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Text(
-          '設定',
-          style: GoogleFonts.nunito(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
+    return const GradientHeader(title: '設定');
   }
 
   /// 💎 プレミアムセクション
@@ -356,12 +336,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Container(
           decoration: BoxDecoration(
             color: AppTheme.cardColor,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.08)),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primary.withValues(alpha: 0.06),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: AppTheme.primary.withValues(alpha: 0.10),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -393,9 +374,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// 食事別カロリー目標タイル（各食事をタップで編集）
-  Widget _buildMealGoalTile(String type, String label, int currentGoal) {
+  Widget _buildMealGoalTile(String type, int currentGoal) {
+    final label = MealMeta.of(type).label;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: MealIcon(type: type, size: 36),
       title: Text(
         label,
         style: GoogleFonts.nunito(
@@ -458,7 +441,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await widget.storageService.setNotificationsEnabled(value);
         if (value) {
           await NotificationService.requestPermissions();
-          await NotificationService.scheduleThreeDailyNotifications();
+          await NotificationService.reschedule(widget.storageService);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -673,6 +656,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               final value = int.tryParse(controller.text);
               if (value != null && value > 0) {
                 await widget.storageService.setMealGoal(type, value);
+                // 今日の通知文面は目標カロリーを参照するので組み直す
+                await NotificationService.reschedule(widget.storageService);
                 setState(() {
                   switch (type) {
                     case 'breakfast': _breakfastGoal = value; break;

@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../services/storage_service.dart';
 import '../models/food_entry.dart';
 import '../theme.dart';
+import '../widgets/share_card.dart';
+import '../widgets/ui.dart';
 
 class HomeScreen extends StatefulWidget {
   final StorageService storageService;
@@ -41,19 +43,48 @@ class HomeScreenState extends State<HomeScreen> {
 
   String _getPontaMessage() {
     final ratio = _todayCalories / _calorieGoal;
+    final List<String> pool;
     if (_todayCalories == 0) {
-      return 'さっさと記録するぽん。始めないと意味ないぽん。';
+      pool = [
+        'さっさと記録するぽん。始めないと意味ないぽん。',
+        '無記録は普通に草ぽん。とりあえず1件入れるぽん。',
+        '今日のお前、まだ透明人間ぽん（記録ゼロ）。',
+        '記録なし＝食べてないは通用しないぽん。正直に書くぽん。',
+      ];
     } else if (ratio <= 0.5) {
-      return 'おっ、やるじゃないかぽん！その調子で続けるぽん！';
+      pool = [
+        'おっ、やるじゃないかぽん！その調子で続けるぽん！',
+        '順調すぎて逆に怖いぽん。何か企んでるぽん？',
+        'この調子なら今日のお前、優勝ぽん🏆',
+        '有能すぎるぽん。ぽんぽこ、ちょっと感動してるぽん。',
+      ];
     } else if (ratio < 0.8) {
-      return 'まあ悪くはないぽん。油断すんなよぽん。';
+      pool = [
+        'まあ悪くはないぽん。油断すんなよぽん。',
+        'ここからが本番ぽん。夜のお前は信用してないぽん。',
+        '今のところセーフぽん。夜食だけはマジでやめるぽん。',
+      ];
     } else if (ratio < 1.0) {
-      return 'ギリギリだぽん。あと少し、踏ん張るぽん。';
+      pool = [
+        'ギリギリだぽん。あと少し、踏ん張るぽん。',
+        '残りHPわずかぽん。ここで食べたら即死ぽん。',
+        '瀬戸際ぽん。冷蔵庫に近づくの禁止ぽん。',
+      ];
     } else if (ratio < 1.2) {
-      return 'オーバーしてるじゃないかぽん。反省するぽん。';
+      pool = [
+        'オーバーしてるじゃないかぽん。反省するぽん。',
+        'はい、オーバー。言い訳は聞かないぽん。',
+        'オーバーしたのは事実ぽん。でも記録したお前は偉いぽん。',
+      ];
     } else {
-      return 'はあ？食いすぎだぽん。明日からやり直すぽん。';
+      pool = [
+        'はあ？食いすぎだぽん。明日からやり直すぽん。',
+        'もう笑うしかないぽん。明日の自分に謝っとくぽん。',
+        'ここまで食ったら逆に清々しいぽん。明日リセットぽん。',
+      ];
     }
+    // 日替わり＋合計値で変わる（同じ状態のうちは同じセリフで安定させる）
+    return pool[(DateTime.now().day + _todayCalories) % pool.length];
   }
 
   String _getPontaImage() {
@@ -71,7 +102,7 @@ class HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final progress = (_todayCalories / _calorieGoal).clamp(0.0, 1.5);
+    final progress = _todayCalories / _calorieGoal;
     final remaining = _calorieGoal - _todayCalories;
     final dateStr = DateFormat('M月d日（E）', 'ja').format(DateTime.now());
 
@@ -79,16 +110,28 @@ class HomeScreenState extends State<HomeScreen> {
       child: Column(
         children: [
           _buildHeader(dateStr),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                _buildPontaCard(),
-                const SizedBox(height: 20),
-                _buildCalorieCard(progress, remaining),
-                const SizedBox(height: 20),
-                _buildMealSummary(),
-              ],
+          // ぽんぽこカードをヘッダーに重ねて奥行きを出す
+          // （translateはレイアウト位置を変えないため、余白はヘッダー側と下端paddingで調整）
+          Transform.translate(
+            offset: const Offset(0, -44),
+            child: Padding(
+              // 下端はFABに隠れないよう余白を広めに取る
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 66),
+              child: Column(
+                children: [
+                  _buildPontaCard(),
+                  const SizedBox(height: 16),
+                  StreakBar(
+                    streak: widget.storageService.getStreakDays(),
+                    weekRecorded: widget.storageService.getRecordedThisWeek(),
+                    recordedToday: _todayEntries.isNotEmpty,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildCalorieCard(progress, remaining),
+                  const SizedBox(height: 16),
+                  _buildMealSummary(),
+                ],
+              ),
             ),
           ),
         ],
@@ -97,68 +140,32 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeader(String dateStr) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
-      decoration: BoxDecoration(
-        gradient: AppTheme.headerGradient,
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              dateStr,
-              style: GoogleFonts.nunito(
-                fontSize: 14,
-                color: Colors.white.withValues(alpha: 0.8),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'ぽんぽこ',
-              style: GoogleFonts.nunito(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
+    return GradientHeader(
+      title: 'ぽんぽこ',
+      subtitle: dateStr,
+      bottomPadding: 48, // ぽんぽこカードが重なるぶん深めに取る
+      trailing: IconButton(
+        onPressed: () => showShareCardDialog(context, widget.storageService),
+        icon: const Icon(Icons.ios_share_rounded, color: Colors.white),
+        tooltip: '今日の記録を共有',
       ),
     );
   }
 
   Widget _buildPontaCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primary.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
-          Image.asset(_getPontaImage(), width: 64, height: 64),
-          const SizedBox(width: 12),
+          Image.asset(_getPontaImage(), width: 72, height: 72),
+          const SizedBox(width: 14),
           Expanded(
             child: Text(
               _getPontaMessage(),
               style: GoogleFonts.nunito(
                 fontSize: 14,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
+                height: 1.5,
                 color: AppTheme.textPrimary,
               ),
             ),
@@ -169,150 +176,87 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCalorieCard(double progress, int remaining) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primary.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(
-            '今日のカロリー',
-            style: GoogleFonts.nunito(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: 160,
-            height: 160,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                SizedBox(
-                  width: 160,
-                  height: 160,
-                  child: CircularProgressIndicator(
-                    value: progress.clamp(0.0, 1.0),
-                    strokeWidth: 12,
-                    backgroundColor: AppTheme.surface,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      progress > 1.0 ? AppTheme.danger : AppTheme.primary,
-                    ),
-                  ),
-                ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '$_todayCalories',
-                      style: GoogleFonts.nunito(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w800,
-                        color: progress > 1.0
-                            ? AppTheme.danger
-                            : AppTheme.primary,
-                      ),
-                    ),
-                    Text(
-                      '/ $_calorieGoal kcal',
-                      style: GoogleFonts.nunito(
-                        fontSize: 13,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            remaining >= 0 ? '残り $remaining kcal' : '${-remaining} kcal オーバー',
-            style: GoogleFonts.nunito(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: remaining >= 0 ? AppTheme.success : AppTheme.danger,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMealSummary() {
-    final mealTypes = {
-      'breakfast': '朝食 🌅',
-      'lunch': '昼食 ☀️',
-      'dinner': '夕食 🌙',
-      'snack': 'おやつ 🍪',
-    };
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primary.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '食事の内訳',
-            style: GoogleFonts.nunito(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...mealTypes.entries.map((entry) {
-            final mealCalories = _todayEntries
-                .where((e) => e.type == entry.key)
-                .fold(0, (sum, e) => sum + e.calories);
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return AppCard(
+        child: Column(
+          children: [
+            const SectionTitle('今日のカロリー'),
+            const SizedBox(height: 20),
+            CalorieRing(
+              progress: progress,
+              center: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    entry.value,
+                    '$_todayCalories',
                     style: GoogleFonts.nunito(
-                      fontSize: 14,
-                      color: AppTheme.textPrimary,
+                      fontSize: 40,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                      color: progress > 1.0
+                          ? AppTheme.danger
+                          : AppTheme.textPrimary,
                     ),
                   ),
                   Text(
-                    '$mealCalories kcal',
+                    '/ $_calorieGoal kcal',
                     style: GoogleFonts.nunito(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.textSecondary,
                     ),
                   ),
                 ],
               ),
-            );
-          }),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: (remaining >= 0 ? AppTheme.success : AppTheme.danger)
+                    .withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                remaining >= 0
+                    ? 'あと $remaining kcal 食べられる'
+                    : '$_calorieGoal kcal を ${-remaining} kcal オーバー',
+                style: GoogleFonts.nunito(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: remaining >= 0
+                      ? const Color(0xFF2E7D32)
+                      : AppTheme.danger,
+                ),
+              ),
+            ),
+          ],
+        ),
+    );
+  }
+
+  Widget _buildMealSummary() {
+    final goals = {
+      'breakfast': widget.storageService.getBreakfastGoal(),
+      'lunch': widget.storageService.getLunchGoal(),
+      'dinner': widget.storageService.getDinnerGoal(),
+      'snack': widget.storageService.getSnackGoal(),
+    };
+
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionTitle('食事の内訳'),
+          const SizedBox(height: 8),
+          for (final entry in goals.entries)
+            MealProgressRow(
+              type: entry.key,
+              calories: _todayEntries
+                  .where((e) => e.type == entry.key)
+                  .fold(0, (sum, e) => sum + e.calories),
+              goal: entry.value,
+            ),
         ],
       ),
     );
