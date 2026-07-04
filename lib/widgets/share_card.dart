@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../services/storage_service.dart';
 import '../theme.dart';
+import 'ponta_puppet.dart';
 import 'ui.dart';
 
 /// 今日の記録をストーリーズ向け縦長カードにして共有するダイアログを開く
@@ -136,13 +137,7 @@ class _DailyShareCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Image.asset(
-                  remaining >= 0
-                      ? 'assets/images/ponta_happy.png'
-                      : 'assets/images/ponta_shocked.png',
-                  width: 88,
-                  height: 88,
-                ),
+                const PontaPuppet(size: 84),
                 const SizedBox(height: 10),
                 // 合計カロリー
                 Text.rich(

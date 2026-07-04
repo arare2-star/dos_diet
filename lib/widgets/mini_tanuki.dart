@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../services/sfx_service.dart';
 import '../theme.dart';
 
 /// 🦝 画面の内側をうろちょろするドット絵ミニたぬき。
@@ -24,6 +25,85 @@ class MiniTanukiLayer extends StatelessWidget {
             areaHeight: constraints.maxHeight,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// カードや空状態に置ける待機ポーズのミニたぬき。
+/// トコトコと同じ横向きスプライトで、まばたきし、タップでぴょん＋「ぽんっ」
+class TanukiSprite extends StatefulWidget {
+  /// 表示高さ。幅はスプライト比率(28:24)から自動で決まる
+  final double size;
+  final bool facingRight;
+
+  const TanukiSprite({super.key, this.size = 52, this.facingRight = true});
+
+  @override
+  State<TanukiSprite> createState() => _TanukiSpriteState();
+}
+
+class _TanukiSpriteState extends State<TanukiSprite>
+    with SingleTickerProviderStateMixin {
+  late final Ticker _ticker;
+  Duration _lastTick = Duration.zero;
+  final _rand = Random();
+
+  double _blinkTimer = 2.5;
+  bool _blinking = false;
+  double _jumpT = 1.0; // 1.0=ジャンプしていない
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = createTicker(_onTick)..start();
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  void _onTick(Duration elapsed) {
+    final dt =
+        ((elapsed - _lastTick).inMicroseconds / 1e6).clamp(0.0, 0.05);
+    _lastTick = elapsed;
+    var changed = false;
+    _blinkTimer -= dt;
+    if (_blinkTimer <= 0) {
+      _blinking = !_blinking;
+      _blinkTimer = _blinking ? 0.12 : 2 + _rand.nextDouble() * 3;
+      changed = true;
+    }
+    if (_jumpT < 1.0) {
+      _jumpT = min(1.0, _jumpT + dt * 2.5);
+      changed = true;
+    }
+    if (changed && mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final jumpY = _jumpT < 1.0 ? -sin(pi * _jumpT) * 8 : 0.0;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        Sfx.play('pon');
+        setState(() => _jumpT = 0);
+      },
+      child: SizedBox(
+        width: widget.size * _TanukiSpritePainter.aspect,
+        height: widget.size,
+        child: Transform.translate(
+          offset: Offset(0, jumpY),
+          child: Transform.flip(
+            flipX: !widget.facingRight,
+            child: CustomPaint(
+              painter: _TanukiSpritePainter(frame: 0, blinking: _blinking),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -59,10 +139,9 @@ class _MiniTanukiState extends State<MiniTanuki>
 
   _TanukiState _state = _TanukiState.idle;
 
-  /// 画面内側の縁を一周する周回路上の位置（弧長）。
-  /// 下辺（左→右）→右壁（上へ）→上辺（右→左）→左壁（下へ）の順に一周する
+  /// 画面下辺（床）の上での足元x位置。壁・天井は歩かない
   double _s = 0;
-  int _dir = 1; // +1=上記の順回り、-1=逆回り
+  int _dir = 1; // +1=右へ、-1=左へ
   double _remaining = 0; // 歩く残り距離
   bool _facingRight = true;
   double _stateTimer = 2.0; // 今の状態の残り秒数（idle用）
@@ -71,23 +150,12 @@ class _MiniTanukiState extends State<MiniTanuki>
   static const _margin = 2.0; // 縁からの足元の距離
   double get _spriteW => widget.size * _TanukiSpritePainter.aspect;
   double get _edgeW => max(1.0, widget.areaWidth - 2 * _margin);
-  double get _edgeH => max(1.0, widget.areaHeight - 2 * _margin);
-  double get _perimeter => 2 * (_edgeW + _edgeH);
+  double get _minX => _margin + _spriteW / 2;
+  double get _maxX => max(_minX, widget.areaWidth - _margin - _spriteW / 2);
 
-  /// 弧長sから足元の位置（x:左から, y:下から）と回転角を返す。
-  /// 回転角は「足がどの縁に着いているか」: 下辺0、右壁-π/2、上辺π（逆さま）、左壁π/2
+  /// 足元の位置（x:左から, y:下から）と回転角（床なので常に0）を返す
   (double, double, double) _pose(double s) {
-    var t = s % _perimeter;
-    if (t < 0) t += _perimeter;
-    if (t < _edgeW) return (_margin + t, _margin, 0);
-    t -= _edgeW;
-    if (t < _edgeH) return (widget.areaWidth - _margin, _margin + t, -pi / 2);
-    t -= _edgeH;
-    if (t < _edgeW) {
-      return (widget.areaWidth - _margin - t, widget.areaHeight - _margin, pi);
-    }
-    t -= _edgeW;
-    return (_margin, widget.areaHeight - _margin - t, pi / 2);
+    return (s.clamp(_minX, _maxX), _margin, 0);
   }
 
   // まばたき
@@ -146,17 +214,22 @@ class _MiniTanukiState extends State<MiniTanuki>
       case _TanukiState.idle:
         _stateTimer -= dt;
         if (_stateTimer <= 0) {
-          // 向きと距離を決めて縁に沿って歩き出す（角は曲がって続行）
+          // 向きと距離を決めて床を歩き出す
           _dir = _rand.nextBool() ? 1 : -1;
           _remaining = 90 + _rand.nextDouble() * 420;
-          // 周回の順方向はどの縁でもスプライトの右向きに当たる
           _facingRight = _dir > 0;
           _state = _TanukiState.walk;
         }
       case _TanukiState.walk:
         _walkTime += dt;
         final step = _speed * dt;
-        _s = (_s + _dir * step) % _perimeter;
+        _s += _dir * step;
+        // 床の端まで来たら折り返す
+        if (_s <= _minX || _s >= _maxX) {
+          _s = _s.clamp(_minX, _maxX);
+          _dir = -_dir;
+          _facingRight = _dir > 0;
+        }
         _remaining -= step;
         if (_remaining <= 0) {
           _state = _TanukiState.idle;
@@ -170,6 +243,7 @@ class _MiniTanukiState extends State<MiniTanuki>
 
   void _onTap() {
     HapticFeedback.lightImpact();
+    Sfx.play('pon');
     _jumpT = 0;
     _speech = _speeches[_rand.nextInt(_speeches.length)];
     _speechTimer = 1.6;

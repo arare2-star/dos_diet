@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../services/storage_service.dart';
 import '../models/food_entry.dart';
 import '../theme.dart';
+import '../widgets/ponta_puppet.dart';
 import '../widgets/share_card.dart';
 import '../widgets/ui.dart';
 
@@ -87,19 +88,6 @@ class HomeScreenState extends State<HomeScreen> {
     return pool[(DateTime.now().day + _todayCalories) % pool.length];
   }
 
-  String _getPontaImage() {
-    final ratio = _todayCalories / _calorieGoal;
-    if (_todayCalories == 0 || ratio <= 0.5) {
-      return 'assets/images/ponta_happy.png';
-    } else if (ratio < 1.0) {
-      return 'assets/images/ponta_default.png';
-    } else if (ratio < 1.3) {
-      return 'assets/images/ponta_shocked.png';
-    } else {
-      return 'assets/images/ponta_angry.png';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final progress = _todayCalories / _calorieGoal;
@@ -157,7 +145,7 @@ class HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
-          Image.asset(_getPontaImage(), width: 72, height: 72),
+          const PontaPuppet(size: 76),
           const SizedBox(width: 14),
           Expanded(
             child: Text(

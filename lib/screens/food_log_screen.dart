@@ -10,6 +10,7 @@ import '../screens/paywall_screen.dart';
 import '../models/food_entry.dart';
 import '../theme.dart';
 import '../services/notification_service.dart';
+import '../widgets/ponta_puppet.dart';
 import '../widgets/slot_jackpot.dart';
 import '../widgets/ui.dart';
 
@@ -226,11 +227,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                     ),
                     child: Row(
                       children: [
-                        Image.asset(
-                          feedback.imagePath,
-                          width: 64,
-                          height: 64,
-                        ),
+                        const PontaPuppet(size: 64),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -571,11 +568,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Image.asset(
-                        'assets/images/ponta_default.png',
-                        width: 110,
-                        height: 110,
-                      ),
+                      const PontaPuppet(size: 110),
                       const SizedBox(height: 12),
                       Text(
                         'まだ記録がないぽん！\n食事を追加するぽん',

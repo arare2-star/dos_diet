@@ -25,6 +25,7 @@ dependencies:
   flutter_timezone: ^1.0.4
   in_app_purchase: ^3.2.0
   share_plus: ^13.2.0
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -35,7 +36,5 @@ flutter:
   uses-material-design: true
   assets:
     - .env
-    - assets/images/ponta_default.png
-    - assets/images/ponta_happy.png
-    - assets/images/ponta_angry.png
-    - assets/images/ponta_shocked.png
+    - assets/sounds/
+    - assets/images/ponta_parts/

@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../services/sfx_service.dart';
 import '../theme.dart';
+import 'ponta_puppet.dart';
 
 /// 当たりの格。演出の派手さが変わる
 enum SlotRank {
@@ -207,10 +209,13 @@ class _SlotOverlayState extends State<_SlotOverlay>
       duration: const Duration(milliseconds: 950),
     );
 
-    // リール停止のたびにハプティクス
+    // リール回転音（ループ）。停止のたびにハプティクス＋停止音
+    Sfx.startLoop('spin_loop', volume: 0.6);
     for (final t in stopsMs) {
       Future.delayed(Duration(milliseconds: t), () {
-        if (mounted) _reelStopHaptics();
+        if (!mounted) return;
+        _reelStopHaptics();
+        Sfx.play('reel_stop');
       });
     }
 
@@ -220,6 +225,7 @@ class _SlotOverlayState extends State<_SlotOverlay>
           Duration(milliseconds: _stopsMs[_digits.length - 2] + 80), () {
         if (!mounted) return;
         HapticFeedback.heavyImpact();
+        Sfx.play('reach');
         setState(() => _reachShown = true);
       });
     }
@@ -229,6 +235,7 @@ class _SlotOverlayState extends State<_SlotOverlay>
       Future.delayed(Duration(milliseconds: _totalMs - 1450), () {
         if (!mounted) return;
         HapticFeedback.heavyImpact();
+        Sfx.play('cutin');
         _cutin.forward();
       });
     }
@@ -236,6 +243,8 @@ class _SlotOverlayState extends State<_SlotOverlay>
     _spin.forward().whenComplete(() {
       if (!mounted) return;
       HapticFeedback.heavyImpact();
+      Sfx.stopLoop();
+      Sfx.play(_isJackpot ? 'fanfare_jackpot' : 'fanfare_win');
       setState(() => _showResult = true);
       _resultCtrl.forward();
       _confetti.repeat();
@@ -244,6 +253,7 @@ class _SlotOverlayState extends State<_SlotOverlay>
 
   @override
   void dispose() {
+    Sfx.stopLoop();
     _spin.dispose();
     _resultCtrl.dispose();
     _confetti.dispose();
@@ -407,19 +417,17 @@ class _SlotOverlayState extends State<_SlotOverlay>
     );
   }
 
-  /// 激アツカットイン: 色フラッシュ→帯が開いてぽんぽこが横切る
+  /// 激アツカットイン: 色フラッシュ→帯が開いて「激アツ！！」
   Widget _buildCutin(BuildContext context) {
-    final screen = MediaQuery.of(context).size;
     return AnimatedBuilder(
       animation: _cutin,
       builder: (_, _) {
         final t = _cutin.value;
         if (t <= 0 || t >= 1) return const SizedBox.shrink();
-        // 帯は最初と最後にシュッと開閉、ぽんぽこは左から右へ横切る
+        // 帯は最初と最後にシュッと開閉する
         final band = t < 0.15
             ? t / 0.15
             : (t > 0.85 ? (1 - t) / 0.15 : 1.0);
-        final x = (-0.45 + 1.75 * Curves.easeInOut.transform(t)) * screen.width;
         final flash = (1 - t * 3.5).clamp(0.0, 1.0);
         return IgnorePointer(
           child: Stack(
@@ -443,36 +451,21 @@ class _SlotOverlayState extends State<_SlotOverlay>
                         BoxShadow(color: Colors.black54, blurRadius: 24),
                       ],
                     ),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      alignment: Alignment.center,
-                      children: [
-                        ShaderMask(
-                          shaderCallback: (bounds) => const LinearGradient(
-                            colors: [Color(0xFFFFF176), Color(0xFFFF8A65)],
-                          ).createShader(bounds),
-                          child: Text(
-                            '激アツ！！',
-                            style: GoogleFonts.nunito(
-                              fontSize: 46,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: 6,
-                            ),
+                    child: Center(
+                      child: ShaderMask(
+                        shaderCallback: (bounds) => const LinearGradient(
+                          colors: [Color(0xFFFFF176), Color(0xFFFF8A65)],
+                        ).createShader(bounds),
+                        child: Text(
+                          '激アツ！！',
+                          style: GoogleFonts.nunito(
+                            fontSize: 46,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 6,
                           ),
                         ),
-                        Positioned(
-                          left: x,
-                          child: Transform.rotate(
-                            angle: -0.12,
-                            child: Image.asset(
-                              'assets/images/ponta_shocked.png',
-                              width: 130,
-                              height: 130,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -618,11 +611,7 @@ class _SlotOverlayState extends State<_SlotOverlay>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Image.asset(
-                  'assets/images/ponta_happy.png',
-                  width: 72,
-                  height: 72,
-                ),
+                const PontaPuppet(size: 76),
                 const SizedBox(width: 12),
                 Flexible(
                   child: Text(
