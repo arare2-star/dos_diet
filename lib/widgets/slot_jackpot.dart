@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../services/sfx_service.dart';
 import '../theme.dart';
+import 'mini_tanuki.dart';
 import 'ponta_puppet.dart';
 
 /// 当たりの格。演出の派手さが変わる
@@ -132,6 +133,7 @@ class _SlotOverlayState extends State<_SlotOverlay>
   late final AnimationController _pulse;
   late final AnimationController _burst; // サンバースト回転
   late final AnimationController _cutin; // 激アツカットイン
+  late final AnimationController _shake; // 画面シェイク（減衰）
 
   late final List<int> _digits;
   late final List<List<int>> _strips;
@@ -139,7 +141,13 @@ class _SlotOverlayState extends State<_SlotOverlay>
   late final int _totalMs;
   late final List<double> _stopFracs; // 各リールが止まるタイミング（0〜1）
   late final List<_ConfettiParticle> _particles;
+  late final List<_KobanParticle> _kobans;
+  late final List<_HerdTanuki> _herd;
   late final bool _isReach; // 最後の1本以外が同じ数字で止まる
+
+  // 大群・小判の時間源（コントローラのループ境界で位置が飛ばないように）
+  final Stopwatch _resultClock = Stopwatch();
+  double _shakeAmp = 0;
 
   bool _showResult = false;
   bool _reachShown = false;
@@ -184,6 +192,12 @@ class _SlotOverlayState extends State<_SlotOverlay>
     ];
 
     _particles = List.generate(130, (_) => _ConfettiParticle(rand));
+    // 小判の雨（激アツは多め）。ミニたぬき大群は激アツ限定
+    _kobans = List.generate(
+      widget.result.rank == SlotRank.jackpot ? 34 : 22,
+      (_) => _KobanParticle(rand),
+    );
+    _herd = List.generate(16, (_) => _HerdTanuki(rand));
 
     _spin = AnimationController(
       vsync: this,
@@ -209,14 +223,20 @@ class _SlotOverlayState extends State<_SlotOverlay>
       vsync: this,
       duration: const Duration(milliseconds: 950),
     );
+    _shake = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 450),
+    );
 
-    // リール回転音（ループ）。停止のたびにハプティクス＋停止音
+    // リール回転音（ループ）。停止のたびにハプティクス＋停止音＋画面シェイク
     Sfx.startLoop('spin_loop', volume: 0.6);
-    for (final t in stopsMs) {
-      Future.delayed(Duration(milliseconds: t), () {
+    for (var i = 0; i < stopsMs.length; i++) {
+      final last = i == stopsMs.length - 1;
+      Future.delayed(Duration(milliseconds: stopsMs[i]), () {
         if (!mounted) return;
         _reelStopHaptics();
         Sfx.play('reel_stop');
+        _startShake(last ? 12 : 6);
       });
     }
 
@@ -237,6 +257,7 @@ class _SlotOverlayState extends State<_SlotOverlay>
         if (!mounted) return;
         HapticFeedback.heavyImpact();
         Sfx.play('cutin');
+        _startShake(9);
         _cutin.forward();
       });
     }
@@ -246,10 +267,18 @@ class _SlotOverlayState extends State<_SlotOverlay>
       HapticFeedback.heavyImpact();
       Sfx.stopLoop();
       Sfx.play(_isJackpot ? 'fanfare_jackpot' : 'fanfare_win');
+      _resultClock.start();
       setState(() => _showResult = true);
+      _startShake(16);
       _resultCtrl.forward();
       _confetti.repeat();
     });
+  }
+
+  /// 減衰つき画面シェイクを振幅ampで発動する
+  void _startShake(double amp) {
+    _shakeAmp = amp;
+    _shake.forward(from: 0);
   }
 
   @override
@@ -261,6 +290,7 @@ class _SlotOverlayState extends State<_SlotOverlay>
     _pulse.dispose();
     _burst.dispose();
     _cutin.dispose();
+    _shake.dispose();
     super.dispose();
   }
 
@@ -287,7 +317,21 @@ class _SlotOverlayState extends State<_SlotOverlay>
         // 結果発表後のみタップで閉じられる
         onTap: _showResult ? () => Navigator.pop(context) : null,
         behavior: HitTestBehavior.opaque,
-        child: Stack(
+        // 画面シェイク: 停止・カットイン・結果発表で全体がガタッと揺れて減衰
+        child: AnimatedBuilder(
+          animation: _shake,
+          builder: (_, child) {
+            final t = _shake.value;
+            final decay = (1 - t) * (1 - t);
+            return Transform.translate(
+              offset: Offset(
+                sin(t * 42) * _shakeAmp * decay,
+                cos(t * 31) * _shakeAmp * 0.7 * decay,
+              ),
+              child: child,
+            );
+          },
+          child: Stack(
         children: [
           // 背景の回転サンバースト（リーチ・結果発表で強まる）
           AnimatedBuilder(
@@ -342,6 +386,20 @@ class _SlotOverlayState extends State<_SlotOverlay>
                 ),
               ),
             ),
+          // 小判の雨（葉っぱで降ってきて途中で小判に化ける）
+          if (_showResult)
+            AnimatedBuilder(
+              animation: _confetti,
+              builder: (_, _) => CustomPaint(
+                size: MediaQuery.of(context).size,
+                painter: _KobanPainter(
+                  timeSec: _resultClock.elapsedMilliseconds / 1000,
+                  particles: _kobans,
+                ),
+              ),
+            ),
+          // フィーバー限定: ミニたぬきの大群が全画面を走り回る（本体の後ろ）
+          if (_showResult && _isJackpot) _buildStampede(context),
           // 本体
           SafeArea(
             child: Center(
@@ -386,6 +444,7 @@ class _SlotOverlayState extends State<_SlotOverlay>
               },
             ),
         ],
+          ),
         ),
       ),
     );
@@ -500,13 +559,16 @@ class _SlotOverlayState extends State<_SlotOverlay>
   }
 
   Widget _buildReels() {
-    final reelWidth = _digits.length >= 4 ? 58.0 : 68.0;
+    // 画面幅いっぱいまでリールを広げる（横マージンと隙間を引いて等分）
+    final screenW = MediaQuery.of(context).size.width;
+    final n = _digits.length;
+    final reelWidth = ((screenW - 32 - n * 10) / n).clamp(56.0, 110.0);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 0; i < _digits.length; i++)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 5),
             child: _buildReel(i, reelWidth),
           ),
       ],
@@ -514,7 +576,7 @@ class _SlotOverlayState extends State<_SlotOverlay>
   }
 
   Widget _buildReel(int index, double width) {
-    const height = 96.0;
+    final height = width * 1.5;
     final anim = CurvedAnimation(
       parent: _spin,
       curve: Interval(0, _stopFracs[index], curve: Curves.easeOutCubic),
@@ -568,9 +630,9 @@ class _SlotOverlayState extends State<_SlotOverlay>
             clipBehavior: Clip.antiAlias,
             child: Stack(
               children: [
-                _reelDigit(strip[i], -frac * height, height),
+                _reelDigit(strip[i], -frac * height, width),
                 if (i + 1 < strip.length)
-                  _reelDigit(strip[i + 1], (1 - frac) * height, height),
+                  _reelDigit(strip[i + 1], (1 - frac) * height, width),
               ],
             ),
           ),
@@ -579,7 +641,7 @@ class _SlotOverlayState extends State<_SlotOverlay>
     );
   }
 
-  Widget _reelDigit(int digit, double dy, double height) {
+  Widget _reelDigit(int digit, double dy, double reelWidth) {
     return Positioned.fill(
       child: Transform.translate(
         offset: Offset(0, dy),
@@ -587,13 +649,50 @@ class _SlotOverlayState extends State<_SlotOverlay>
           child: Text(
             '$digit',
             style: GoogleFonts.nunito(
-              fontSize: 52,
+              fontSize: reelWidth * 0.76, // リール幅に追従して大きく
               fontWeight: FontWeight.w900,
               color: AppTheme.textPrimary,
             ),
           ),
         ),
       ),
+    );
+  }
+
+  /// フィーバー限定: ミニたぬきの大群が画面全体をトコトコ走り抜ける
+  Widget _buildStampede(BuildContext context) {
+    final screen = MediaQuery.of(context).size;
+    const walkCycle = [1, 2, 3, 2];
+    return AnimatedBuilder(
+      animation: _confetti,
+      builder: (_, _) {
+        final t = _resultClock.elapsedMilliseconds / 1000;
+        return Positioned.fill(
+          child: IgnorePointer(
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (final d in _herd)
+                  Positioned(
+                    left: (d.x0 + d.speed * t) % (screen.width + 160) - 130,
+                    top: 60 + d.yFrac * (screen.height - 140),
+                    child: SizedBox(
+                      width: d.size * TanukiSpritePainter.aspect,
+                      height: d.size,
+                      child: CustomPaint(
+                        painter: TanukiSpritePainter(
+                          frame: walkCycle[
+                              ((t / 0.13).floor() + d.phase) % walkCycle.length],
+                          blinking: false,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -643,6 +742,107 @@ class _SlotOverlayState extends State<_SlotOverlay>
       ),
     );
   }
+}
+
+/// 大群の1匹分のパラメータ
+class _HerdTanuki {
+  final double x0; // 初期位置(px)
+  final double speed; // px/s
+  final double size;
+  final double yFrac; // 画面のどの高さを走るか（0=上端、1=下端）
+  final int phase; // 歩行コマの位相ずらし
+
+  _HerdTanuki(Random rand)
+      : x0 = rand.nextDouble() * 600,
+        speed = 90 + rand.nextDouble() * 90,
+        size = 36 + rand.nextDouble() * 20,
+        yFrac = rand.nextDouble(),
+        phase = rand.nextInt(4);
+}
+
+/// 小判の雨の1枚分。葉っぱで降ってきて flipY を過ぎると小判に化ける
+class _KobanParticle {
+  final double x;
+  final double startY;
+  final double speed; // 1周/秒
+  final double size;
+  final double sway; // 横揺れの位相
+  final double tilt; // 傾き
+  final double flipY; // 化ける高さ（0〜1）
+
+  _KobanParticle(Random rand)
+      : x = rand.nextDouble(),
+        startY = rand.nextDouble(),
+        speed = 0.22 + rand.nextDouble() * 0.18,
+        size = 11 + rand.nextDouble() * 9,
+        sway = rand.nextDouble() * 2 * pi,
+        tilt = (rand.nextDouble() - 0.5) * 0.9,
+        flipY = 0.2 + rand.nextDouble() * 0.45;
+}
+
+class _KobanPainter extends CustomPainter {
+  final double timeSec;
+  final List<_KobanParticle> particles;
+
+  _KobanPainter({required this.timeSec, required this.particles});
+
+  static const _leaf = Color(0xFF66BB6A);
+  static const _leafDark = Color(0xFF388E3C);
+  static const _gold = Color(0xFFFFD54F);
+  static const _goldDark = Color(0xFFB8860B);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint();
+    final stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6;
+
+    for (final p in particles) {
+      final y = (p.startY + timeSec * p.speed) % 1.12 - 0.06;
+      final x = p.x + sin(timeSec * 1.8 + p.sway) * 0.035;
+      final isKoban = y >= p.flipY;
+      // 化ける瞬間はコインフリップのように横に潰れる
+      final d = (y - p.flipY).abs();
+      final squash = d < 0.03 ? (d / 0.03) : 1.0;
+
+      canvas.save();
+      canvas.translate(x * size.width, y * size.height);
+      canvas.rotate(p.tilt + sin(timeSec * 2.2 + p.sway) * 0.25);
+      canvas.scale(squash, 1);
+
+      if (isKoban) {
+        // 小判: 金の縦長楕円＋縁取り＋刻み線
+        final rect =
+            Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 1.45);
+        paint.color = _gold;
+        canvas.drawOval(rect, paint);
+        stroke.color = _goldDark;
+        canvas.drawOval(rect, stroke);
+        canvas.drawLine(
+          Offset(-p.size * 0.22, 0),
+          Offset(p.size * 0.22, 0),
+          stroke,
+        );
+      } else {
+        // 葉っぱ: 緑の楕円＋葉脈
+        final rect =
+            Rect.fromCenter(center: Offset.zero, width: p.size * 1.5, height: p.size * 0.85);
+        paint.color = _leaf;
+        canvas.drawOval(rect, paint);
+        stroke.color = _leafDark;
+        canvas.drawLine(
+          Offset(-p.size * 0.6, 0),
+          Offset(p.size * 0.6, 0),
+          stroke,
+        );
+      }
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_KobanPainter old) => old.timeSec != timeSec;
 }
 
 class _ConfettiParticle {

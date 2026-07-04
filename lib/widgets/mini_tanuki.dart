@@ -93,14 +93,14 @@ class _TanukiSpriteState extends State<TanukiSprite>
         setState(() => _jumpT = 0);
       },
       child: SizedBox(
-        width: widget.size * _TanukiSpritePainter.aspect,
+        width: widget.size * TanukiSpritePainter.aspect,
         height: widget.size,
         child: Transform.translate(
           offset: Offset(0, jumpY),
           child: Transform.flip(
             flipX: !widget.facingRight,
             child: CustomPaint(
-              painter: _TanukiSpritePainter(frame: 0, blinking: _blinking),
+              painter: TanukiSpritePainter(frame: 0, blinking: _blinking),
             ),
           ),
         ),
@@ -148,7 +148,7 @@ class _MiniTanukiState extends State<MiniTanuki>
   double _walkTime = 0; // 歩行アニメの経過秒数
 
   static const _margin = 2.0; // 縁からの足元の距離
-  double get _spriteW => widget.size * _TanukiSpritePainter.aspect;
+  double get _spriteW => widget.size * TanukiSpritePainter.aspect;
   double get _edgeW => max(1.0, widget.areaWidth - 2 * _margin);
   double get _minX => _margin + _spriteW / 2;
   double get _maxX => max(_minX, widget.areaWidth - _margin - _spriteW / 2);
@@ -348,7 +348,7 @@ class _MiniTanukiState extends State<MiniTanuki>
                           child: Transform.flip(
                             flipX: !_facingRight,
                             child: CustomPaint(
-                              painter: _TanukiSpritePainter(
+                              painter: TanukiSpritePainter(
                                 frame: frame,
                                 blinking: _blinking,
                               ),
@@ -370,11 +370,11 @@ class _MiniTanukiState extends State<MiniTanuki>
 
 /// 28x24のピクセルマップをそのまま描く（横向き・右向き基準）。
 /// frame 0=待機、1〜3=歩行コマ。ドット絵はスクラッチパッドの tanuki_v4.py で生成。
-class _TanukiSpritePainter extends CustomPainter {
+class TanukiSpritePainter extends CustomPainter {
   final int frame;
   final bool blinking;
 
-  _TanukiSpritePainter({required this.frame, required this.blinking});
+  TanukiSpritePainter({required this.frame, required this.blinking});
 
   static const int _cols = 28;
   static const int _rows = 24;
@@ -526,6 +526,6 @@ class _TanukiSpritePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_TanukiSpritePainter old) =>
+  bool shouldRepaint(TanukiSpritePainter old) =>
       old.blinking != blinking || old.frame != frame;
 }
