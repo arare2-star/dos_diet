@@ -107,7 +107,8 @@ Future<void> showSlotOverlay(BuildContext context, SlotTriggerResult result) {
   return showGeneralDialog(
     context: context,
     barrierDismissible: false,
-    barrierColor: Colors.black.withValues(alpha: 0.9),
+    barrierColor: Colors.black, // 下の画面が透けないよう完全不透明
+
     barrierLabel: 'slot',
     transitionDuration: const Duration(milliseconds: 250),
     pageBuilder: (_, _, _) => _SlotOverlay(result: result),
@@ -611,7 +612,8 @@ class _SlotOverlayState extends State<_SlotOverlay>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const PontaPuppet(size: 76),
+                // 大当たりはドヤ顔で祝う
+                const PontaPuppet(size: 76, expression: PontaExpression.wink),
                 const SizedBox(width: 12),
                 Flexible(
                   child: Text(

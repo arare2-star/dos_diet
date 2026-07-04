@@ -86,8 +86,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
               ),
               const SizedBox(height: 8),
 
-              // キャラクター（トコトコと同じ横向きドット絵）
-              const PontaPuppet(size: 110),
+              // ジト目＝辛口コーチの営業顔
+              const PontaPuppet(size: 110, expression: PontaExpression.smug),
               const SizedBox(height: 16),
 
               // タイトル

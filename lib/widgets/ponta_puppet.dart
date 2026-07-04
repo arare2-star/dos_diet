@@ -6,6 +6,14 @@ import 'package:flutter/services.dart';
 
 import '../services/sfx_service.dart';
 
+/// ぽんぽこの表情。頭パーツ（tools/extract_head.py で切り出し）の差し替えで実現
+enum PontaExpression {
+  normal, // 基本のにこにこ
+  wink, // ウインク＋にやり（当たり・達成のドヤ顔）
+  smug, // ジト目（辛口コーチ）
+  shock, // 手を頭に＋汗（がーん）
+}
+
 /// 🦝 パーツ分け素材を組み立てて動かすぽんぽこ人形。
 /// 素材は assets/images/ponta_parts/（ChatGPT生成画像を tools/extract_parts.py で
 /// 背景抜き＋切り出ししたもの）。しっぽ・頭・手が常時ゆるく動き、タップでぴょん＋「ぽんっ」
@@ -13,7 +21,13 @@ class PontaPuppet extends StatefulWidget {
   /// 表示高さ。幅はデザイン比率(560:660)から自動で決まる
   final double size;
 
-  const PontaPuppet({super.key, this.size = 96});
+  final PontaExpression expression;
+
+  const PontaPuppet({
+    super.key,
+    this.size = 96,
+    this.expression = PontaExpression.normal,
+  });
 
   @override
   State<PontaPuppet> createState() => _PontaPuppetState();
@@ -118,9 +132,22 @@ class _PontaPuppetState extends State<PontaPuppet>
               _part('arm_r',
                   left: 302, top: 420, width: 152,
                   angle: -armA, pivot: const Alignment(-0.8, 0.8)),
-              _part('head',
-                  left: 77, top: 30, width: 407,
-                  angle: headA, pivot: const Alignment(0, 0.85)),
+              // 表情差分の頭。shockは汗マークの分クロップが少し大きいので、
+              // 顔の大きさが揃うよう配置を微調整している
+              switch (widget.expression) {
+                PontaExpression.normal => _part('head',
+                    left: 77, top: 30, width: 407,
+                    angle: headA, pivot: const Alignment(0, 0.85)),
+                PontaExpression.wink => _part('head_wink',
+                    left: 77, top: 30, width: 407,
+                    angle: headA, pivot: const Alignment(0, 0.85)),
+                PontaExpression.smug => _part('head_smug',
+                    left: 77, top: 40, width: 406,
+                    angle: headA, pivot: const Alignment(0, 0.85)),
+                PontaExpression.shock => _part('head_shock',
+                    left: 72, top: 14, width: 420,
+                    angle: headA, pivot: const Alignment(0, 0.85)),
+              },
             ],
           ),
         ),

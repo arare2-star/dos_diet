@@ -137,7 +137,8 @@ class _DailyShareCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                const PontaPuppet(size: 84),
+                // SNS用はドヤ顔で
+                const PontaPuppet(size: 84, expression: PontaExpression.wink),
                 const SizedBox(height: 10),
                 // 合計カロリー
                 Text.rich(

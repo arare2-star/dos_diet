@@ -140,12 +140,21 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// セリフのトーン（_getPontaMessageの段階分け）と表情を揃える
+  PontaExpression _getPontaExpression() {
+    final ratio = _todayCalories / _calorieGoal;
+    if (_todayCalories == 0) return PontaExpression.smug; // 辛口の催促
+    if (ratio <= 0.5) return PontaExpression.wink; // ドヤ褒め
+    if (ratio < 0.8) return PontaExpression.normal;
+    return PontaExpression.shock; // ギリギリ〜オーバーは冷や汗
+  }
+
   Widget _buildPontaCard() {
     return AppCard(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
-          const PontaPuppet(size: 76),
+          PontaPuppet(size: 76, expression: _getPontaExpression()),
           const SizedBox(width: 14),
           Expanded(
             child: Text(

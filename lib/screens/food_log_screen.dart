@@ -47,21 +47,26 @@ class FoodLogScreenState extends State<FoodLogScreen> {
   }
 
   /// 🎰 記録を保存してダイアログを閉じ、当たり条件を満たせばスロット演出を出す
-  Future<void> _saveEntry(FoodEntry entry, BuildContext dialogContext) async {
+  /// （手入力は数字を自由に打てて演出が狙えてしまうため withSlot: false で保存のみ）
+  Future<void> _saveEntry(FoodEntry entry, BuildContext dialogContext,
+      {bool withSlot = true}) async {
     await widget.storageService.addFoodEntry(entry);
     refresh();
     // 今日の通知文面を最新の記録状態で組み直す
     NotificationService.reschedule(widget.storageService);
 
-    final dayTotal = widget.storageService
-        .getFoodEntriesForDate(_selectedDate)
-        .fold(0, (sum, e) => sum + e.calories);
-    final trigger = SlotTrigger.check(
-      entryCalories: entry.calories,
-      mealType: entry.type,
-      dayTotal: dayTotal,
-      dailyGoal: widget.storageService.getCalorieGoal(),
-    );
+    SlotTriggerResult? trigger;
+    if (withSlot) {
+      final dayTotal = widget.storageService
+          .getFoodEntriesForDate(_selectedDate)
+          .fold(0, (sum, e) => sum + e.calories);
+      trigger = SlotTrigger.check(
+        entryCalories: entry.calories,
+        mealType: entry.type,
+        dayTotal: dayTotal,
+        dailyGoal: widget.storageService.getCalorieGoal(),
+      );
+    }
 
     if (dialogContext.mounted) Navigator.pop(dialogContext);
     if (trigger != null && mounted) {
@@ -227,7 +232,15 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                     ),
                     child: Row(
                       children: [
-                        const PontaPuppet(size: 64),
+                        // 表情もフィードバックのトーンに合わせる
+                        PontaPuppet(
+                          size: 64,
+                          expression: ratio > 1.0
+                              ? PontaExpression.shock
+                              : ratio <= 0.8
+                                  ? PontaExpression.wink
+                                  : PontaExpression.normal,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -359,7 +372,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                     type: selectedType,
                     dateTime: _selectedDate,
                   );
-                  _saveEntry(entry, context);
+                  _saveEntry(entry, context, withSlot: false);
                 }
               },
               child: const Text('追加'),
