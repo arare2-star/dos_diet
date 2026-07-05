@@ -6,12 +6,20 @@ import 'package:flutter/services.dart';
 
 import '../services/sfx_service.dart';
 
-/// ぽんぽこの表情。頭パーツ（tools/extract_head.py で切り出し）の差し替えで実現
+/// ぽんぽこの表情。頭パーツの差し替えで実現。
+/// normal〜shockは初期セット（tools/extract_head.py）、
+/// angry以降はマッチョ仕様書シート由来（tools/extract_macho.py、ponta_macho/）
 enum PontaExpression {
   normal, // 基本のにこにこ
   wink, // ウインク＋にやり（当たり・達成のドヤ顔）
   smug, // ジト目（辛口コーチ）
   shock, // 手を頭に＋汗（がーん）
+  angry, // 怒り（怒りマーク＋鼻息）
+  panic, // 焦る（汗だくだく）
+  plead, // お願い（うるうる＋両手。※顔に手が含まれるので腕は非表示になる）
+  sleepy, // 眠い（Zzz抜きの半目）
+  cry, // 泣く（大粒の涙）
+  surprised, // 驚き（目まんまる＋フラッシュ）
 }
 
 /// 🦝 パーツ分け素材を組み立てて動かすぽんぽこ人形。
@@ -83,10 +91,11 @@ class _PontaPuppetState extends State<PontaPuppet>
     required double width,
     double angle = 0,
     Alignment pivot = Alignment.center,
+    String folder = 'ponta_parts',
   }) {
     final s = widget.size / _designH;
     final child = Image.asset(
-      'assets/images/ponta_parts/$name.png',
+      'assets/images/$folder/$name.png',
       width: width * s,
       filterQuality: FilterQuality.medium,
     );
@@ -109,6 +118,9 @@ class _PontaPuppetState extends State<PontaPuppet>
     final breathe = sin(_t * 2 * pi / 2.0) * 1.6; // 全体のふわふわ(px)
     final jumpY = _jumpT < 1.0 ? -sin(pi * _jumpT) * widget.size * 0.12 : 0.0;
 
+    // お願い顔は両手が顔パーツに含まれるので、ボディ側の腕を外す（手4本防止）
+    final hideArms = widget.expression == PontaExpression.plead;
+
     return GestureDetector(
       onTap: _onTap,
       child: SizedBox(
@@ -126,32 +138,55 @@ class _PontaPuppetState extends State<PontaPuppet>
               _part('body', left: 91, top: 350, width: 378),
               _part('foot_l', left: 150, top: 528, width: 143),
               _part('foot_r', left: 272, top: 528, width: 137),
-              _part('arm_l',
-                  left: 96, top: 420, width: 169,
-                  angle: armA, pivot: const Alignment(0.8, 0.8)),
-              _part('arm_r',
-                  left: 302, top: 420, width: 152,
-                  angle: -armA, pivot: const Alignment(-0.8, 0.8)),
-              // 表情差分の頭。shockは汗マークの分クロップが少し大きいので、
-              // 顔の大きさが揃うよう配置を微調整している
-              switch (widget.expression) {
-                PontaExpression.normal => _part('head',
-                    left: 77, top: 30, width: 407,
-                    angle: headA, pivot: const Alignment(0, 0.85)),
-                PontaExpression.wink => _part('head_wink',
-                    left: 77, top: 30, width: 407,
-                    angle: headA, pivot: const Alignment(0, 0.85)),
-                PontaExpression.smug => _part('head_smug',
-                    left: 77, top: 40, width: 406,
-                    angle: headA, pivot: const Alignment(0, 0.85)),
-                PontaExpression.shock => _part('head_shock',
-                    left: 72, top: 14, width: 420,
-                    angle: headA, pivot: const Alignment(0, 0.85)),
-              },
+              if (!hideArms) ...[
+                _part('arm_l',
+                    left: 96, top: 420, width: 169,
+                    angle: armA, pivot: const Alignment(0.8, 0.8)),
+                _part('arm_r',
+                    left: 302, top: 420, width: 152,
+                    angle: -armA, pivot: const Alignment(-0.8, 0.8)),
+              ],
+              // 表情差分の頭。クロップの広さが表情ごとに違うので
+              // 顔の大きさが揃うよう配置を個別調整している（tools/compose_mix.pyが原本）
+              _head(headA),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _head(double headA) {
+    const pivot = Alignment(0, 0.85);
+    return switch (widget.expression) {
+      PontaExpression.normal => _part('head',
+          left: 77, top: 30, width: 407, angle: headA, pivot: pivot),
+      PontaExpression.wink => _part('head_wink',
+          left: 77, top: 30, width: 407, angle: headA, pivot: pivot),
+      PontaExpression.smug => _part('head_smug',
+          left: 77, top: 40, width: 406, angle: headA, pivot: pivot),
+      PontaExpression.shock => _part('head_shock',
+          left: 72, top: 14, width: 420, angle: headA, pivot: pivot),
+      // 怒りはクロップ右側にマーク・鼻息が入る分、幅を広げて顔中心を体に合わせる
+      // （顔本体は幅161/191なので 407*191/161≈483 で他と同じ顔サイズになる）
+      PontaExpression.angry => _part('face_angry',
+          left: 77, top: 50, width: 483,
+          angle: headA, pivot: pivot, folder: 'ponta_macho'),
+      PontaExpression.panic => _part('face_panic',
+          left: 70, top: 35, width: 415,
+          angle: headA, pivot: pivot, folder: 'ponta_macho'),
+      PontaExpression.plead => _part('face_plead',
+          left: 77, top: 30, width: 407,
+          angle: headA, pivot: pivot, folder: 'ponta_macho'),
+      PontaExpression.sleepy => _part('face_sleepy',
+          left: 77, top: 35, width: 410,
+          angle: headA, pivot: pivot, folder: 'ponta_macho'),
+      PontaExpression.cry => _part('face_cry',
+          left: 77, top: 35, width: 410,
+          angle: headA, pivot: pivot, folder: 'ponta_macho'),
+      PontaExpression.surprised => _part('face_shock',
+          left: 65, top: 52, width: 445,
+          angle: headA, pivot: pivot, folder: 'ponta_macho'),
+    };
   }
 }

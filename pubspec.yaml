@@ -26,6 +26,7 @@ dependencies:
   in_app_purchase: ^3.2.0
   share_plus: ^13.2.0
   audioplayers: ^6.1.0
+  home_widget: ^0.9.3
 
 dev_dependencies:
   flutter_test:
@@ -38,3 +39,4 @@ flutter:
     - .env
     - assets/sounds/
     - assets/images/ponta_parts/
+    - assets/images/ponta_macho/

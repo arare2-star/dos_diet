@@ -5,12 +5,38 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'theme.dart';
 import 'services/storage_service.dart';
 import 'services/notification_service.dart';
+import 'services/home_widget_service.dart';
 import 'services/subscription_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/food_log_screen.dart';
 import 'screens/stats_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/imashime_report_screen.dart';
 import 'widgets/mini_tanuki.dart';
+
+/// 通知タップからの画面遷移用（通知はウィジェットツリーの外から来るため）
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+/// 通知payloadを解釈して対応する画面を開く。
+/// `imashime:<y>-<m>-<d>` → その日付の戒めレポート
+void _handleNotificationPayload(StorageService storage, String payload) {
+  final parts = payload.split(':');
+  if (parts.length != 2 || parts[0] != 'imashime') return;
+  final DateTime date;
+  try {
+    final ymd = parts[1].split('-').map(int.parse).toList();
+    date = DateTime(ymd[0], ymd[1], ymd[2]);
+  } catch (_) {
+    return;
+  }
+  navigatorKey.currentState?.push(MaterialPageRoute(
+    fullscreenDialog: true,
+    builder: (_) => ImashimeReportScreen(
+      storageService: storage,
+      date: date,
+    ),
+  ));
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,13 +51,26 @@ void main() async {
   final subscriptionService = SubscriptionService();
   await subscriptionService.init();
 
-  // アプリ起動時に現在の記録状態で通知を組み直す（無効時はreschedule内で何もしない）
+  // アプリ起動時に現在の記録状態で通知とホームウィジェットを組み直す
   await NotificationService.reschedule(storageService);
+  await HomeWidgetService.update(storageService);
+
+  // 通知タップ→戒めレポート等の画面遷移
+  NotificationService.onNotificationTap =
+      (payload) => _handleNotificationPayload(storageService, payload);
+  final launchPayload = await NotificationService.getLaunchPayload();
 
   runApp(DosDietApp(
     storageService: storageService,
     subscriptionService: subscriptionService,
   ));
+
+  // 通知タップでアプリが起動された場合（コールドスタート）は初回フレーム後に開く
+  if (launchPayload != null) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handleNotificationPayload(storageService, launchPayload);
+    });
+  }
 }
 
 class DosDietApp extends StatelessWidget {
@@ -48,6 +87,7 @@ class DosDietApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Dos Diet',
+      navigatorKey: navigatorKey,
       theme: AppTheme.theme,
       debugShowCheckedModeBanner: false,
       // 日本語ローカライズ設定

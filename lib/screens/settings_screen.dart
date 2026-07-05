@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/storage_service.dart';
 import '../services/notification_service.dart';
+import '../services/home_widget_service.dart';
 import '../services/subscription_service.dart';
 import '../screens/paywall_screen.dart';
 import '../theme.dart';
@@ -504,12 +505,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: AppTheme.primary,
         ),
       ),
+      subtitle: Text(
+        '次に届く通知と同じ文面をすぐ確認できるよ',
+        style: GoogleFonts.nunito(
+          fontSize: 13,
+          color: AppTheme.textSecondary,
+        ),
+      ),
       leading: const Padding(
         padding: EdgeInsets.only(left: 0),
         child: Text('🐾', style: TextStyle(fontSize: 20)),
       ),
       onTap: () async {
-        await NotificationService.showPontaNotification();
+        await NotificationService.showTestNotification(widget.storageService);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -656,8 +664,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               final value = int.tryParse(controller.text);
               if (value != null && value > 0) {
                 await widget.storageService.setMealGoal(type, value);
-                // 今日の通知文面は目標カロリーを参照するので組み直す
+                // 今日の通知文面とウィジェットは目標カロリーを参照するので組み直す
                 await NotificationService.reschedule(widget.storageService);
+                await HomeWidgetService.update(widget.storageService);
                 setState(() {
                   switch (type) {
                     case 'breakfast': _breakfastGoal = value; break;

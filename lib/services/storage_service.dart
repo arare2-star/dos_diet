@@ -232,6 +232,40 @@ class StorageService {
     return streak;
   }
 
+  // ムキムキ判定（ホームのMachoPonta表示条件）
+
+  /// 減量が続いているか: 最新3回の体重記録が単調減少で、最新が7日以内
+  bool isWeightTrendingDown() {
+    final entries = getWeightEntries()
+      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+    if (entries.length < 3) return false;
+    final last3 = entries.sublist(entries.length - 3);
+    if (DateTime.now().difference(last3.last.dateTime).inDays > 7) {
+      return false;
+    }
+    return last3[0].weight > last3[1].weight &&
+        last3[1].weight > last3[2].weight;
+  }
+
+  /// 昨日から遡って「記録あり かつ 合計が目標以内」が何日連続しているか
+  int daysWithinGoalStreak() {
+    final goal = getCalorieGoal();
+    if (goal <= 0) return 0;
+    var streak = 0;
+    final now = DateTime.now();
+    var day = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 1));
+    while (streak < 366) {
+      final entries = getFoodEntriesForDate(day);
+      if (entries.isEmpty) break;
+      final total = entries.fold(0, (sum, e) => sum + e.calories);
+      if (total > goal) break;
+      streak++;
+      day = day.subtract(const Duration(days: 1));
+    }
+    return streak;
+  }
+
   /// 今週（月〜日）の各曜日に記録があるか
   List<bool> getRecordedThisWeek() {
     final now = DateTime.now();

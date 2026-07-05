@@ -5,6 +5,7 @@ import '../services/storage_service.dart';
 import '../models/food_entry.dart';
 import '../theme.dart';
 import '../widgets/ponta_puppet.dart';
+import '../widgets/macho_ponta.dart';
 import '../widgets/share_card.dart';
 import '../widgets/ui.dart';
 
@@ -40,6 +41,23 @@ class HomeScreenState extends State<HomeScreen> {
       _todayEntries = widget.storageService.getFoodEntriesForDate(today);
       _todayCalories = widget.storageService.getTotalCaloriesForDate(today);
     });
+  }
+
+  /// ムキムキ条件: 減量が続いている or 目標カロリー以内が5日連続。
+  /// ただし今日すでにオーバーしていたら説得力がないので解除
+  bool _isMacho() {
+    if (_calorieGoal > 0 && _todayCalories > _calorieGoal) return false;
+    return widget.storageService.isWeightTrendingDown() ||
+        widget.storageService.daysWithinGoalStreak() >= 5;
+  }
+
+  String _getMachoMessage() {
+    const pool = [
+      '見ろぽん、この仕上がり💪 継続の賜物ぽん。',
+      '努力は筋肉に出るぽん💪 今のお前は強いぽん。',
+      '仕上がってるぽん💪 この調子で維持するぽん。',
+    ];
+    return pool[(DateTime.now().day + _todayCalories) % pool.length];
   }
 
   String _getPontaMessage() {
@@ -146,19 +164,25 @@ class HomeScreenState extends State<HomeScreen> {
     if (_todayCalories == 0) return PontaExpression.smug; // 辛口の催促
     if (ratio <= 0.5) return PontaExpression.wink; // ドヤ褒め
     if (ratio < 0.8) return PontaExpression.normal;
-    return PontaExpression.shock; // ギリギリ〜オーバーは冷や汗
+    if (ratio <= 1.0) return PontaExpression.panic; // ギリギリは汗だくで焦る
+    return PontaExpression.angry; // オーバーは怒り
   }
 
   Widget _buildPontaCard() {
+    final isMacho = _isMacho();
     return AppCard(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
-          PontaPuppet(size: 76, expression: _getPontaExpression()),
+          // 頑張りが続いているときだけムキムキ化（減量継続 or 目標内5日連続）
+          if (isMacho)
+            const MachoPonta(size: 80)
+          else
+            PontaPuppet(size: 76, expression: _getPontaExpression()),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
-              _getPontaMessage(),
+              isMacho ? _getMachoMessage() : _getPontaMessage(),
               style: GoogleFonts.nunito(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,

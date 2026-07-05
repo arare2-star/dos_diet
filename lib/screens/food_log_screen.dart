@@ -10,6 +10,7 @@ import '../screens/paywall_screen.dart';
 import '../models/food_entry.dart';
 import '../theme.dart';
 import '../services/notification_service.dart';
+import '../services/home_widget_service.dart';
 import '../widgets/ponta_puppet.dart';
 import '../widgets/slot_jackpot.dart';
 import '../widgets/ui.dart';
@@ -52,8 +53,9 @@ class FoodLogScreenState extends State<FoodLogScreen> {
       {bool withSlot = true}) async {
     await widget.storageService.addFoodEntry(entry);
     refresh();
-    // 今日の通知文面を最新の記録状態で組み直す
+    // 今日の通知文面とホームウィジェットを最新の記録状態で組み直す
     NotificationService.reschedule(widget.storageService);
+    HomeWidgetService.update(widget.storageService);
 
     SlotTriggerResult? trigger;
     if (withSlot) {
@@ -236,7 +238,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                         PontaPuppet(
                           size: 64,
                           expression: ratio > 1.0
-                              ? PontaExpression.shock
+                              ? PontaExpression.surprised
                               : ratio <= 0.8
                                   ? PontaExpression.wink
                                   : PontaExpression.normal,
@@ -688,6 +690,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
         await widget.storageService.removeFoodEntry(entry.id);
         refresh();
         NotificationService.reschedule(widget.storageService);
+        HomeWidgetService.update(widget.storageService);
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),

@@ -86,8 +86,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
               ),
               const SizedBox(height: 8),
 
-              // ジト目＝辛口コーチの営業顔
-              const PontaPuppet(size: 110, expression: PontaExpression.smug),
+              // うるうる両手で「お願い、課金して」
+              const PontaPuppet(size: 110, expression: PontaExpression.plead),
               const SizedBox(height: 16),
 
               // タイトル

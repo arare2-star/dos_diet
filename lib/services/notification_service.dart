@@ -20,6 +20,19 @@ class NotificationService {
   static const List<int> _slotHours = [8, 12, 19];
   static const int _daysAhead = 7;
 
+  // 戒めレポート通知（今日オーバー確定時のみ21時に出す）
+  static const int _imashimeId = 9000;
+  static const int _imashimeHour = 21;
+
+  /// 通知タップ時のハンドラ。main.dartで配線し、payloadに応じて画面を開く
+  static void Function(String payload)? onNotificationTap;
+
+  static const List<String> _imashimeNotifBodies = [
+    '今日の戒めレポートができたぽん…直視する勇気、あるぽんか 👀',
+    '目標オーバー確定ぽん。戒めレポートで反省会するぽん 🔥',
+    '本日の戒めレポートが届いてるぽん。逃げずに開くぽん 🐾',
+  ];
+
   // ── 明日以降用: 記録状態に触れない汎用メッセージ ──────────────────
 
   static const List<String> _genericMorning = [
@@ -101,7 +114,24 @@ class NotificationService {
       android: androidSettings,
       iOS: iosSettings,
     );
-    await _plugin.initialize(settings);
+    await _plugin.initialize(
+      settings,
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload != null && payload.isNotEmpty) {
+          onNotificationTap?.call(payload);
+        }
+      },
+    );
+  }
+
+  /// アプリが通知タップで起動された場合のpayload（コールドスタート用）。なければnull
+  static Future<String?> getLaunchPayload() async {
+    final details = await _plugin.getNotificationAppLaunchDetails();
+    if (details?.didNotificationLaunchApp ?? false) {
+      return details!.notificationResponse?.payload;
+    }
+    return null;
   }
 
   static Future<void> requestPermissions() async {
@@ -166,6 +196,27 @@ class NotificationService {
         );
       }
     }
+
+    // 今日すでにオーバー確定なら、21時に戒めレポートの呼び出し通知を出す。
+    // 記録・削除のたびに全通知が組み直されるので、オーバーが解消すれば自動で消える
+    final today = DateTime.now();
+    final total = storage.getTotalCaloriesForDate(today);
+    final goal = storage.getCalorieGoal();
+    if (goal > 0 && total > goal) {
+      final scheduled = tz.TZDateTime(
+          tz.local, now.year, now.month, now.day, _imashimeHour);
+      if (scheduled.isAfter(now)) {
+        await _plugin.zonedSchedule(
+          _imashimeId,
+          'ぽんぽこコーチ 🐾',
+          _pick(_imashimeNotifBodies, today.day),
+          scheduled,
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          payload: 'imashime:${today.year}-${today.month}-${today.day}',
+        );
+      }
+    }
   }
 
   /// 今日の枠: 組み直し時点の実データから文面を作る
@@ -226,18 +277,21 @@ class NotificationService {
     await _plugin.cancelAll();
   }
 
-  /// テスト用：即時通知
-  static Future<void> showPontaNotification() async {
-    const messages = [
-      'ごはん記録したかぽん？ 🐾 ぽんぽこが見守ってるぽん！',
-      '今日もがんばってるぽん！カロリー記録忘れずにぽん 🐾',
-      'ぽんぽこだぽん！食事の記録つけるぽん 🍽️',
-      '今日の食事はどうだったぽん？記録するぽん 🐾',
-      'ダイエット頑張ってるぽん！ぽんぽこが応援してるぽん 💪🐾',
-      '食べたものを記録して、健康的な毎日を送るぽん！ 🐾',
-      'ぽんぽこコーチからぽん：今日も食事記録よろしくぽん！ 🐾',
-    ];
-    final message = messages[DateTime.now().millisecond % messages.length];
+  /// デバッグ用: 登録済み通知の一覧をログに出す
+  static Future<void> debugPrintPending() async {
+    final pending = await _plugin.pendingNotificationRequests();
+    for (final p in pending) {
+      // ignore: avoid_print
+      print('[pending] id=${p.id} payload=${p.payload} body=${p.body}');
+    }
+  }
+
+  /// テスト用：次に届く予定の枠と同じロジック・実データで文面を作り、即時に出す
+  static Future<void> showTestNotification(StorageService storage) async {
+    final hour = DateTime.now().hour;
+    final slot = _slotHours.firstWhere((h) => hour < h,
+        orElse: () => _slotHours.last);
+    final message = _todayMessage(slot, storage);
 
     const androidDetails = AndroidNotificationDetails(
       'ponta_coach',
