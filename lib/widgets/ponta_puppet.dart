@@ -22,6 +22,16 @@ enum PontaExpression {
   surprised, // 驚き（目まんまる＋フラッシュ）
 }
 
+/// 頭の横に浮かぶエフェクト（マッチョ仕様書シートのエフェクトパーツ由来）
+enum PontaEffect {
+  sweat, // 汗（焦り）
+  fire, // 燃えてる（炎上・オーバー）
+  heart, // ハート（ご機嫌・お願い）
+  meat, // 肉
+  beer, // ビール
+  rice, // ご飯（記録の催促）
+}
+
 /// 🦝 パーツ分け素材を組み立てて動かすぽんぽこ人形。
 /// 素材は assets/images/ponta_parts/（ChatGPT生成画像を tools/extract_parts.py で
 /// 背景抜き＋切り出ししたもの）。しっぽ・頭・手が常時ゆるく動き、タップでぴょん＋「ぽんっ」
@@ -31,10 +41,14 @@ class PontaPuppet extends StatefulWidget {
 
   final PontaExpression expression;
 
+  /// 頭の横にふわふわ浮かぶエフェクト（nullなら無し）
+  final PontaEffect? effect;
+
   const PontaPuppet({
     super.key,
     this.size = 96,
     this.expression = PontaExpression.normal,
+    this.effect,
   });
 
   @override
@@ -149,11 +163,27 @@ class _PontaPuppetState extends State<PontaPuppet>
               // 表情差分の頭。クロップの広さが表情ごとに違うので
               // 顔の大きさが揃うよう配置を個別調整している（tools/compose_mix.pyが原本）
               _head(headA),
+              // エフェクトは頭の右上にふわふわ浮かべる
+              if (widget.effect != null) _effect(),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _effect() {
+    final bob = sin(_t * 2 * pi / 1.6) * 8;
+    final (name, width) = switch (widget.effect!) {
+      PontaEffect.sweat => ('fx_sweat', 100.0),
+      PontaEffect.fire => ('fx_fire', 130.0),
+      PontaEffect.heart => ('fx_heart', 140.0),
+      PontaEffect.meat => ('fx_meat', 130.0),
+      PontaEffect.beer => ('fx_beer', 115.0),
+      PontaEffect.rice => ('fx_rice', 130.0),
+    };
+    return _part(name,
+        left: 445, top: -5 + bob, width: width, folder: 'ponta_macho');
   }
 
   Widget _head(double headA) {
