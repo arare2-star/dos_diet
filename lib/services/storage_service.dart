@@ -7,13 +7,10 @@ class StorageService {
   late SharedPreferences _prefs;
 
   static const String _foodEntriesKey = 'food_entries';
-  static const String _calorieGoalKey = 'calorie_goal';
   static const String _notificationsEnabledKey = 'notifications_enabled';
   static const String _notificationHourKey = 'notification_hour';
   static const String _notificationMinuteKey = 'notification_minute';
   static const String _weightEntriesKey = 'weight_entries';
-  static const String _firstScanDateKey = 'first_scan_date';
-  static const String _isPremiumKey = 'is_premium';
 
   // 食事別カロリー目標キー
   static const String _breakfastGoalKey = 'breakfast_goal';
@@ -51,60 +48,9 @@ class StorageService {
     }
   }
 
-  // ---- トライアル・プレミアム管理 ----
-
-  // 初回スキャン日時を取得（未使用ならnull）
-  DateTime? getFirstScanDate() {
-    final ms = _prefs.getInt(_firstScanDateKey);
-    return ms != null ? DateTime.fromMillisecondsSinceEpoch(ms) : null;
-  }
-
-  // 初回スキャン日時を記録（初回のみ）
-  Future<void> recordFirstScanIfNeeded() async {
-    if (_prefs.getInt(_firstScanDateKey) == null) {
-      await _prefs.setInt(
-        _firstScanDateKey,
-        DateTime.now().millisecondsSinceEpoch,
-      );
-    }
-  }
-
-  // トライアル期間内かどうか（初回スキャンから3日以内）
-  bool isTrialActive() {
-    final first = getFirstScanDate();
-    if (first == null) return true; // まだ一度もスキャンしていない
-    return DateTime.now().difference(first).inDays < 3;
-  }
-
-  // プレミアム購入済みかどうか
-  bool getIsPremium() => _prefs.getBool(_isPremiumKey) ?? false;
-
-  Future<void> setIsPremium(bool value) async {
-    await _prefs.setBool(_isPremiumKey, value);
-  }
-
-  // スキャン機能が使えるか（トライアル中 or プレミアム）
-  bool canUseScan() => isTrialActive() || getIsPremium();
-
-  // トライアル残り日数
-  int trialDaysRemaining() {
-    final first = getFirstScanDate();
-    if (first == null) return 3;
-    final diff = DateTime.now().difference(first).inDays;
-    return (3 - diff).clamp(0, 3);
-  }
-
   // 1日合計カロリー目標（食事別の合計。ホーム・統計画面で使用）
   int getCalorieGoal() {
-    // 食事別目標が設定されている場合はその合計を使う
-    final sum = getBreakfastGoal() + getLunchGoal() + getDinnerGoal() + getSnackGoal();
-    // 旧設定が残っている場合は食事別合計を優先
-    return sum;
-  }
-
-  // 旧APIとの互換性のため残す（今後は setMealGoal を使うこと）
-  Future<void> setCalorieGoal(int goal) async {
-    await _prefs.setInt(_calorieGoalKey, goal);
+    return getBreakfastGoal() + getLunchGoal() + getDinnerGoal() + getSnackGoal();
   }
 
   // Notifications
