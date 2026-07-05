@@ -86,8 +86,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
               ),
               const SizedBox(height: 8),
 
-              // うるうる両手で「お願い、課金して」
-              const PontaPuppet(size: 110, expression: PontaExpression.plead),
+              // うるうる両手＋ハートで「お願い、課金して」
+              const PontaPuppet(
+                size: 110,
+                expression: PontaExpression.plead,
+                effect: PontaEffect.heart,
+              ),
               const SizedBox(height: 16),
 
               // タイトル

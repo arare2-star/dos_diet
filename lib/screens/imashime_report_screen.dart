@@ -138,7 +138,12 @@ class ImashimeReportScreen extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
       child: Column(
         children: [
-          const PontaPuppet(size: 120, expression: PontaExpression.cry),
+          // 泣きながら炎上（やらかし感）
+          const PontaPuppet(
+            size: 120,
+            expression: PontaExpression.cry,
+            effect: PontaEffect.fire,
+          ),
           const SizedBox(height: 12),
           Text(
             comment,

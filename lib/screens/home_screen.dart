@@ -168,6 +168,15 @@ class HomeScreenState extends State<HomeScreen> {
     return PontaExpression.angry; // オーバーは怒り
   }
 
+  /// 表情に添えるエフェクト（panicは顔自体に汗が入っているので無し）
+  PontaEffect? _getPontaEffect() {
+    final ratio = _todayCalories / _calorieGoal;
+    if (_todayCalories == 0) return PontaEffect.rice; // ご飯まだ？の催促
+    if (ratio <= 0.5) return PontaEffect.heart; // ご機嫌
+    if (ratio < 1.0 || _calorieGoal <= 0) return null;
+    return PontaEffect.fire; // オーバーは炎上
+  }
+
   Widget _buildPontaCard() {
     final isMacho = _isMacho();
     return AppCard(
@@ -178,7 +187,11 @@ class HomeScreenState extends State<HomeScreen> {
           if (isMacho)
             const MachoPonta(size: 80)
           else
-            PontaPuppet(size: 76, expression: _getPontaExpression()),
+            PontaPuppet(
+              size: 76,
+              expression: _getPontaExpression(),
+              effect: _getPontaEffect(),
+            ),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
