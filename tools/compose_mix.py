@@ -23,7 +23,7 @@ BODY_STACK = [
 # 新表情頭の配置 (name, left, top, width)。既存head(77,30,w407)に顔位置を合わせる
 # 焦る/怒り/驚きは汗・怒りマーク・フラッシュ込みでクロップが広い分を微調整
 NEW_HEADS = {
-    "angry":   ("ponta_macho/face_angry", 55, 35, 450),
+    "angry":   ("ponta_macho/face_angry", 77, 35, 410),  # 淡色版シートで顔幅クロップに
     "panic":   ("ponta_macho/face_panic", 70, 35, 415),
     "plead":   ("ponta_macho/face_plead", 77, 30, 407),
     "sleepy":  ("ponta_macho/face_sleepy", 110, 40, 340),  # クロップが縦長なので小さめ

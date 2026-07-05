@@ -197,10 +197,9 @@ class _PontaPuppetState extends State<PontaPuppet>
           left: 77, top: 40, width: 406, angle: headA, pivot: pivot),
       PontaExpression.shock => _part('head_shock',
           left: 72, top: 14, width: 420, angle: headA, pivot: pivot),
-      // 怒りはクロップ右側にマーク・鼻息が入る分、幅を広げて顔中心を体に合わせる
-      // （顔本体は幅161/191なので 407*191/161≈483 で他と同じ顔サイズになる）
+      // 淡色版シート（11:27版）ではクロップが顔幅になったので他の表情と同じ配置
       PontaExpression.angry => _part('face_angry',
-          left: 77, top: 50, width: 483,
+          left: 77, top: 35, width: 410,
           angle: headA, pivot: pivot, folder: 'ponta_macho'),
       PontaExpression.panic => _part('face_panic',
           left: 70, top: 35, width: 415,

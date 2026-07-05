@@ -24,7 +24,7 @@ class MachoPonta extends StatefulWidget {
 
 class _MachoPontaState extends State<MachoPonta>
     with SingleTickerProviderStateMixin {
-  static const _aspect = 138 / 164;
+  static const _aspect = 138 / 163;
 
   late final Ticker _ticker;
   double _t = 0;
