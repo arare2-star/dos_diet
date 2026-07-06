@@ -24,6 +24,21 @@ class NotificationService {
   static const int _imashimeId = 9000;
   static const int _imashimeHour = 21;
 
+  // 最終日フォールバック（毎日リピート）のid。固定なので呼び出しのたびに自己上書きされる
+  static const Map<int, int> _fallbackIds = {8: 90001, 12: 90002, 19: 90003};
+
+  /// カレンダー上の実日付から一意に決まるid（dayOffset基準にしない）。
+  /// _imashimeId/_fallbackIdsの範囲と重ならないよう10万を底上げしてある
+  static int _stableId(tz.TZDateTime day, int hour) {
+    final dayNumber = DateTime(day.year, day.month, day.day)
+        .difference(DateTime(2024, 1, 1))
+        .inDays;
+    final slot = _slotHours.indexOf(hour);
+    return 100000 + dayNumber * 10 + slot;
+  }
+
+  static int _fallbackId(int hour) => _fallbackIds[hour]!;
+
   /// 通知タップ時のハンドラ。main.dartで配線し、payloadに応じて画面を開く
   static void Function(String payload)? onNotificationTap;
 
@@ -191,8 +206,18 @@ class NotificationService {
         // 最終日だけ毎日リピートにして、組み直しが走らない期間のフォールバックにする
         final isFallback = dayOffset == _daysAhead - 1;
 
+        // idはdayOffset基準ではなく実際のカレンダー日付から算出する。
+        // dayOffset基準だと「今日」が呼び出しごとに別のidになり、
+        // 前回組み直し時の枠（例: 昨日視点の『明日』）が今回のcancelAllで
+        // 消えなかった場合に古い文面と新しい文面が同じ時刻に二重で届く
+        // （実機で確認済み）。日付から一意に決まるidにすれば、
+        // 取りこぼされた古い登録があっても同じidで上書きされるだけになる
+        final id = isFallback
+            ? _fallbackId(hour)
+            : _stableId(day, hour);
+
         await _plugin.zonedSchedule(
-          dayOffset * 100 + hour,
+          id,
           'ぽんぽこコーチ 🐾',
           message,
           scheduled,

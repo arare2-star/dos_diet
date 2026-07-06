@@ -54,7 +54,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
     await widget.storageService.addFoodEntry(entry);
     refresh();
     // 今日の通知文面とホームウィジェットを最新の記録状態で組み直す
-    NotificationService.reschedule(widget.storageService);
+    await NotificationService.reschedule(widget.storageService);
     HomeWidgetService.update(widget.storageService);
 
     SlotTriggerResult? trigger;
@@ -689,7 +689,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
       onDismissed: (_) async {
         await widget.storageService.removeFoodEntry(entry.id);
         refresh();
-        NotificationService.reschedule(widget.storageService);
+        await NotificationService.reschedule(widget.storageService);
         HomeWidgetService.update(widget.storageService);
       },
       child: Container(
