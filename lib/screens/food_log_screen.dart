@@ -413,7 +413,19 @@ class FoodLogScreenState extends State<FoodLogScreen> {
       return true;
     }
 
-    // トライアル期限切れ → ペイウォールを表示
+    // トライアル期限切れ → 一言表示してからペイウォールを表示
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '課金しないと働かないぽん！🐾',
+            style: GoogleFonts.nunito(),
+          ),
+          backgroundColor: AppTheme.secondary,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
     await _showPaywall();
     return widget.subscriptionService.canUseCalorieAnalysis;
   }

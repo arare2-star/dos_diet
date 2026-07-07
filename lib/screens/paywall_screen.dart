@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../services/subscription_service.dart';
 import '../theme.dart';
-import '../widgets/ponta_puppet.dart';
+import '../widgets/lazy_ponta.dart';
 
 class PaywallScreen extends StatefulWidget {
   final SubscriptionService subscriptionService;
@@ -86,12 +86,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
               ),
               const SizedBox(height: 8),
 
-              // うるうる両手＋ハートで「お願い、課金して」
-              const PontaPuppet(
-                size: 110,
-                expression: PontaExpression.plead,
-                effect: PontaEffect.heart,
-              ),
+              // 寝そべって「課金しないと働かないぽん」
+              const LazyPonta(size: 110),
               const SizedBox(height: 16),
 
               // タイトル
