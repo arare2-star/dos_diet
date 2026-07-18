@@ -7,8 +7,7 @@ import 'package:flutter/services.dart';
 import '../services/sfx_service.dart';
 
 /// ぽんぽこの表情。頭パーツの差し替えで実現。
-/// normal〜shockは初期セット（tools/extract_head.py）、
-/// angry以降はマッチョ仕様書シート由来（tools/extract_macho.py、ponta_macho/）
+/// 2026-07-18〜表情シート由来（tools/extract_faces.py、ponta_faces/）に統一
 enum PontaExpression {
   normal, // 基本のにこにこ
   wink, // ウインク＋にやり（当たり・達成のドヤ顔）
@@ -188,34 +187,23 @@ class _PontaPuppetState extends State<PontaPuppet>
 
   Widget _head(double headA) {
     const pivot = Alignment(0, 0.85);
-    return switch (widget.expression) {
-      PontaExpression.normal => _part('head',
-          left: 77, top: 30, width: 407, angle: headA, pivot: pivot),
-      PontaExpression.wink => _part('head_wink',
-          left: 77, top: 30, width: 407, angle: headA, pivot: pivot),
-      PontaExpression.smug => _part('head_smug',
-          left: 77, top: 40, width: 406, angle: headA, pivot: pivot),
-      PontaExpression.shock => _part('head_shock',
-          left: 72, top: 14, width: 420, angle: headA, pivot: pivot),
-      // 淡色版シート（11:27版）ではクロップが顔幅になったので他の表情と同じ配置
-      PontaExpression.angry => _part('face_angry',
-          left: 77, top: 35, width: 410,
-          angle: headA, pivot: pivot, folder: 'ponta_macho'),
-      PontaExpression.panic => _part('face_panic',
-          left: 70, top: 35, width: 415,
-          angle: headA, pivot: pivot, folder: 'ponta_macho'),
-      PontaExpression.plead => _part('face_plead',
-          left: 77, top: 30, width: 407,
-          angle: headA, pivot: pivot, folder: 'ponta_macho'),
-      PontaExpression.sleepy => _part('face_sleepy',
-          left: 77, top: 35, width: 410,
-          angle: headA, pivot: pivot, folder: 'ponta_macho'),
-      PontaExpression.cry => _part('face_cry',
-          left: 77, top: 35, width: 410,
-          angle: headA, pivot: pivot, folder: 'ponta_macho'),
-      PontaExpression.surprised => _part('face_shock',
-          left: 65, top: 52, width: 445,
-          angle: headA, pivot: pivot, folder: 'ponta_macho'),
+    // 表情シート（tools/extract_faces.py、ponta_faces/）は16種あるが
+    // 直接対応しないものは近い見た目を流用: panic→worried, plead→sad,
+    // sleepy→calm_closed, surprised→surprised_q
+    final (name, top, width) = switch (widget.expression) {
+      PontaExpression.normal => ('normal', 30.0, 407.0),
+      PontaExpression.wink => ('wink_grin', 40.0, 407.0),
+      PontaExpression.smug => ('smug_tongue', 32.0, 407.0),
+      PontaExpression.shock => ('shock', 55.0, 407.0),
+      PontaExpression.angry => ('angry', 32.0, 407.0),
+      PontaExpression.panic => ('worried', 20.0, 407.0),
+      PontaExpression.plead => ('sad', 45.0, 407.0),
+      PontaExpression.sleepy => ('calm_closed', 55.0, 407.0),
+      PontaExpression.cry => ('cry', 20.0, 407.0),
+      PontaExpression.surprised => ('surprised_q', 20.0, 407.0),
     };
+    return _part(name,
+        left: 77, top: top, width: width,
+        angle: headA, pivot: pivot, folder: 'ponta_faces');
   }
 }

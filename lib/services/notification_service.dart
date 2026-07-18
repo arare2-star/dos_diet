@@ -12,23 +12,32 @@ import 'storage_service.dart';
 /// - 今日の残り枠: その時点の実データ（合計kcal・目標・記録の有無）から文面を生成。
 ///   記録するたびに組み直されるので、内容が実態とズレない
 /// - 明日以降の枠: 状態を断定しない汎用メッセージを日替わりでローテーション
-/// - 最終日(7日目)の枠だけ毎日リピートにして、アプリを開かない期間が続いても通知が途切れないようにする
+///
+/// 全てカレンダー日付固定の一回きり通知（繰り返しなし）。
+/// 以前は最終日の枠だけ`matchDateTimeComponents: DateTimeComponents.time`で
+/// 毎日リピートさせていたが、iOS側はこの指定だと日付を無視して「時刻」だけで
+/// トリガーするため、次にその時刻が来た瞬間（早ければ即日）から毎日鳴り続けてしまい、
+/// 他の日の通常枠と同じ時刻に二重で届く不具合があった（実機で確認済み）。
+/// そのため繰り返しはやめ、iOSの1アプリあたり予約通知64件上限に収まる範囲で
+/// 先の日付まで一回きり通知を積んでおく方式にしている。
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
   static const List<int> _slotHours = [8, 12, 19];
-  static const int _daysAhead = 7;
+  // iOSは1アプリあたり予約できる通知が最大64件。3枠/日 × 18日 = 54 + 戒め通知1件 = 55で余裕を持たせている
+  static const int _daysAhead = 18;
 
   // 戒めレポート通知（今日オーバー確定時のみ21時に出す）
   static const int _imashimeId = 9000;
   static const int _imashimeHour = 21;
 
-  // 最終日フォールバック（毎日リピート）のid。固定なので呼び出しのたびに自己上書きされる
-  static const Map<int, int> _fallbackIds = {8: 90001, 12: 90002, 19: 90003};
-
   /// カレンダー上の実日付から一意に決まるid（dayOffset基準にしない）。
-  /// _imashimeId/_fallbackIdsの範囲と重ならないよう10万を底上げしてある
+  /// dayOffset基準だと「今日」が呼び出しごとに別のidになり、前回組み直し時の枠
+  /// （例: 昨日視点の『明日』）が今回のcancelAllで消えなかった場合に古い文面と
+  /// 新しい文面が同じ時刻に二重で届くことがあるため、日付から一意に決まるidにして
+  /// 取りこぼされても同じidで上書きされるだけにしてある。_imashimeIdの範囲と
+  /// 重ならないよう10万を底上げしてある
   static int _stableId(tz.TZDateTime day, int hour) {
     final dayNumber = DateTime(day.year, day.month, day.day)
         .difference(DateTime(2024, 1, 1))
@@ -36,8 +45,6 @@ class NotificationService {
     final slot = _slotHours.indexOf(hour);
     return 100000 + dayNumber * 10 + slot;
   }
-
-  static int _fallbackId(int hour) => _fallbackIds[hour]!;
 
   /// 通知タップ時のハンドラ。main.dartで配線し、payloadに応じて画面を開く
   static void Function(String payload)? onNotificationTap;
@@ -203,18 +210,7 @@ class NotificationService {
             ? _todayMessage(hour, storage)
             : _genericMessage(hour, scheduled);
 
-        // 最終日だけ毎日リピートにして、組み直しが走らない期間のフォールバックにする
-        final isFallback = dayOffset == _daysAhead - 1;
-
-        // idはdayOffset基準ではなく実際のカレンダー日付から算出する。
-        // dayOffset基準だと「今日」が呼び出しごとに別のidになり、
-        // 前回組み直し時の枠（例: 昨日視点の『明日』）が今回のcancelAllで
-        // 消えなかった場合に古い文面と新しい文面が同じ時刻に二重で届く
-        // （実機で確認済み）。日付から一意に決まるidにすれば、
-        // 取りこぼされた古い登録があっても同じidで上書きされるだけになる
-        final id = isFallback
-            ? _fallbackId(hour)
-            : _stableId(day, hour);
+        final id = _stableId(day, hour);
 
         await _plugin.zonedSchedule(
           id,
@@ -223,8 +219,6 @@ class NotificationService {
           scheduled,
           details,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          matchDateTimeComponents:
-              isFallback ? DateTimeComponents.time : null,
         );
       }
     }

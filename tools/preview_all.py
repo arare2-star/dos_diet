@@ -11,16 +11,16 @@ CANVAS = (560, 660)
 
 # (folder, name, left, top, width) 表情ごとの頭配置。ponta_puppet.dart _head() と同一
 HEADS = {
-    "normal":    ("ponta_parts", "head", 77, 30, 407),
-    "wink":      ("ponta_parts", "head_wink", 77, 30, 407),
-    "smug":      ("ponta_macho", "head_smug", 77, 40, 406),
-    "shock":     ("ponta_parts", "head_shock", 72, 14, 420),
-    "angry":     ("ponta_macho", "face_angry", 77, 35, 410),
-    "panic":     ("ponta_macho", "face_panic", 70, 35, 415),
-    "plead":     ("ponta_macho", "face_plead", 77, 30, 407),
-    "sleepy":    ("ponta_macho", "face_sleepy", 77, 35, 410),
-    "cry":       ("ponta_macho", "face_cry", 77, 35, 410),
-    "surprised": ("ponta_macho", "face_shock", 65, 52, 445),
+    "normal":    ("ponta_faces", "normal", 77, 30, 407),
+    "wink":      ("ponta_faces", "wink_grin", 77, 40, 407),
+    "smug":      ("ponta_faces", "smug_tongue", 77, 32, 407),
+    "shock":     ("ponta_faces", "shock", 77, 55, 407),
+    "angry":     ("ponta_faces", "angry", 77, 32, 407),
+    "panic":     ("ponta_faces", "worried", 77, 20, 407),
+    "plead":     ("ponta_faces", "sad", 77, 45, 407),
+    "sleepy":    ("ponta_faces", "calm_closed", 77, 55, 407),
+    "cry":       ("ponta_faces", "cry", 77, 20, 407),
+    "surprised": ("ponta_faces", "surprised_q", 77, 20, 407),
 }
 
 # (folder, name, width) ponta_puppet.dart _effect() と同一。leftは445固定
@@ -48,11 +48,8 @@ def load(folder, name):
 
 
 def compose(expr, effect=None):
-    hide_arms = expr == "plead"
     canvas = Image.new("RGBA", CANVAS, (0, 0, 0, 0))
     for folder, name, x, y in BODY_STACK:
-        if hide_arms and name in ("arm_l", "arm_r"):
-            continue
         canvas.alpha_composite(load(folder, name), (x, y))
     hfolder, hname, hx, hy, hw = HEADS[expr]
     head = load(hfolder, hname)

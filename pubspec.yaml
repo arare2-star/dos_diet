@@ -1,7 +1,7 @@
 name: ponpoko
 description: "辛口ダイエットコーチぽんぽこ - 厳しくもサポートするダイエットアプリ"
 publish_to: 'none'
-version: 1.1.0+4
+version: 1.1.0+5
 
 environment:
   sdk: ^3.10.7
@@ -40,3 +40,4 @@ flutter:
     - assets/sounds/
     - assets/images/ponta_parts/
     - assets/images/ponta_macho/
+    - assets/images/ponta_faces/
