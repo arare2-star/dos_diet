@@ -4,10 +4,90 @@ import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+/// カロリー推定サービス。クラス名は歴史的経緯でOpenAIServiceのままだが、
+/// 2026-09-12からモデルはClaude Sonnet 5（Anthropic API）を使っている。
+/// 比較は tools/scan_test.py で実施（gpt-4o比で外食の過小評価が改善、約1円/5秒）。
 class OpenAIService {
-  static const String _baseUrl = 'https://api.openai.com/v1/chat/completions';
+  static const String _baseUrl = 'https://api.anthropic.com/v1/messages';
+  static const String _model = 'claude-sonnet-5';
 
-  static String get _apiKey => dotenv.env['OPENAI_API_KEY'] ?? '';
+  static String get _apiKey => dotenv.env['ANTHROPIC_API_KEY'] ?? '';
+
+  /// 構造化出力のスキーマ（_prompt内のJSON例と同じ形）。これでJSON以外が混ざらない
+  static const Map<String, dynamic> _schema = {
+    'type': 'object',
+    'properties': {
+      'food_name': {'type': 'string'},
+      'items': {
+        'type': 'array',
+        'items': {
+          'type': 'object',
+          'properties': {
+            'name': {'type': 'string'},
+            'amount': {'type': 'string'},
+            'calories': {'type': 'integer'},
+          },
+          'required': ['name', 'amount', 'calories'],
+          'additionalProperties': false,
+        },
+      },
+      'calories': {'type': 'integer'},
+      'description': {'type': 'string'},
+      'confidence': {'type': 'string', 'enum': ['high', 'medium', 'low']},
+    },
+    'required': ['food_name', 'items', 'calories', 'description', 'confidence'],
+    'additionalProperties': false,
+  };
+
+  /// 品目ごとに分量→kcalを出させて合算する方式。一塊で推定させるより誤差が小さい。
+  /// 皿・茶碗・箸などを基準物にして分量を見積もらせる。
+  static const String _prompt = '''あなたは管理栄養士です。この食事の写真からカロリーを推定してください。
+
+手順:
+1. 写真に写っている料理・食品を1品ずつ分けて挙げる（定食なら白米・味噌汁・主菜・小鉢を別々に）
+2. 各品目の分量(g または ml)を推定する。皿・茶碗・箸・スプーン・手・缶やペットボトルなど、写っている物の大きさを基準にして見積もること
+3. 各品目の分量からカロリーを計算する（一般的な日本の食品成分値に基づく）
+4. 合計を出す
+
+注意（過小評価を防ぐため）:
+- 外食・定食チェーン・コンビニの料理は家庭料理より分量が多く油も多い。外食と思われる写真は多めに見積もる
+- 揚げ物は衣が油を吸うため重量あたりのカロリーが高い（とんかつ・唐揚げ・チキン南蛮・天ぷらは100gあたり250〜300kcal）
+- タルタルソース・マヨネーズ・ドレッシング・甘酢だれ・カレールー・バターなどソース/油脂類は、かかっている量を見積もって必ず別品目として計上する（タルタル大さじ1杯≒100kcal）
+- 分量に迷ったら少なめでなく多めに見積もる。ダイエット用途なので過小評価の方が有害
+
+以下のJSONのみを返してください。説明文は不要です。
+{
+  "food_name": "食事全体の名前（日本語、短く。例: 鮭の塩焼き定食）",
+  "items": [
+    {"name": "品目名（日本語）", "amount": "分量（例: 200g, 180ml, 1個）", "calories": 整数kcal}
+  ],
+  "calories": 合計の整数kcal,
+  "description": "分量の根拠を含む簡単な説明（日本語、1〜2文）",
+  "confidence": "high/medium/low"
+}''';
+
+  /// APIレスポンスのJSONをCalorieResultにする。品目があれば合計は品目の和を優先する
+  static CalorieResult parseResult(Map<String, dynamic> parsed) {
+    final items = ((parsed['items'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((e) => FoodItem(
+              name: (e['name'] ?? '').toString(),
+              amount: (e['amount'] ?? '').toString(),
+              calories: (e['calories'] as num?)?.toInt() ?? 0,
+            ))
+        .where((e) => e.name.isNotEmpty)
+        .toList();
+    final total = items.isNotEmpty
+        ? items.fold<int>(0, (sum, e) => sum + e.calories)
+        : (parsed['calories'] as num?)?.toInt() ?? 0;
+    return CalorieResult(
+      foodName: parsed['food_name'] ?? '不明な食べ物',
+      calories: _dejitterRound(total),
+      description: parsed['description'] ?? '',
+      confidence: parsed['confidence'] ?? 'low',
+      items: items,
+    );
+  }
 
   /// 画像からカロリーを推測する
   static Future<CalorieResult> estimateCaloriesFromImage(File imageFile) async {
@@ -18,32 +98,28 @@ class OpenAIService {
       Uri.parse(_baseUrl),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_apiKey',
+        'x-api-key': _apiKey,
+        'anthropic-version': '2023-06-01',
       },
       body: jsonEncode({
-        'model': 'gpt-4o',
-        'max_tokens': 500,
+        'model': _model,
+        'max_tokens': 4000,
+        'output_config': {
+          'format': {'type': 'json_schema', 'schema': _schema},
+        },
         'messages': [
           {
             'role': 'user',
             'content': [
               {
-                'type': 'text',
-                'text': '''この食べ物の画像を見て、以下の形式でJSONのみを返してください。説明は不要です。
-{
-  "food_name": "食べ物の名前（日本語）",
-  "calories": 推定カロリー数値（整数）,
-  "description": "簡単な説明（日本語、1文）",
-  "confidence": "high/medium/low"
-}''',
-              },
-              {
-                'type': 'image_url',
-                'image_url': {
-                  'url': 'data:image/jpeg;base64,$base64Image',
-                  'detail': 'low',
+                'type': 'image',
+                'source': {
+                  'type': 'base64',
+                  'media_type': 'image/jpeg',
+                  'data': base64Image,
                 },
               },
+              {'type': 'text', 'text': _prompt},
             ],
           },
         ],
@@ -52,18 +128,18 @@ class OpenAIService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      final content = data['choices'][0]['message']['content'] as String;
+      if (data['stop_reason'] == 'refusal') {
+        throw Exception('この画像は解析できませんでした');
+      }
+      final content = (data['content'] as List)
+          .where((b) => b['type'] == 'text')
+          .map((b) => b['text'] as String)
+          .join();
 
       // JSONを抽出してパース
       final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(content);
       if (jsonMatch != null) {
-        final parsed = jsonDecode(jsonMatch.group(0)!);
-        return CalorieResult(
-          foodName: parsed['food_name'] ?? '不明な食べ物',
-          calories: _dejitterRound((parsed['calories'] as num?)?.toInt() ?? 0),
-          description: parsed['description'] ?? '',
-          confidence: parsed['confidence'] ?? 'low',
-        );
+        return parseResult(jsonDecode(jsonMatch.group(0)!));
       }
     }
 
@@ -172,16 +248,26 @@ class PontaFeedback {
   PontaFeedback({required this.message});
 }
 
+class FoodItem {
+  final String name;
+  final String amount;
+  final int calories;
+
+  FoodItem({required this.name, required this.amount, required this.calories});
+}
+
 class CalorieResult {
   final String foodName;
   final int calories;
   final String description;
   final String confidence;
+  final List<FoodItem> items;
 
   CalorieResult({
     required this.foodName,
     required this.calories,
     required this.description,
     required this.confidence,
+    this.items = const [],
   });
 }
