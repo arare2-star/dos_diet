@@ -49,13 +49,22 @@ class FoodLogScreenState extends State<FoodLogScreen> {
 
   /// 🎰 記録を保存してダイアログを閉じ、当たり条件を満たせばスロット演出を出す
   /// （手入力は数字を自由に打てて演出が狙えてしまうため withSlot: false で保存のみ）
+  bool _saving = false;
+
   Future<void> _saveEntry(FoodEntry entry, BuildContext dialogContext,
       {bool withSlot = true}) async {
-    await widget.storageService.addFoodEntry(entry);
-    refresh();
-    // 今日の通知文面とホームウィジェットを最新の記録状態で組み直す
-    await NotificationService.reschedule(widget.storageService);
-    HomeWidgetService.update(widget.storageService);
+    // 保存〜通知組み直しの間にもう一度「記録する」を押されると同じ記録が2重に入るので弾く
+    if (_saving) return;
+    _saving = true;
+    try {
+      await widget.storageService.addFoodEntry(entry);
+      refresh();
+      // 今日の通知文面とホームウィジェットを最新の記録状態で組み直す
+      await NotificationService.reschedule(widget.storageService);
+      HomeWidgetService.update(widget.storageService);
+    } finally {
+      _saving = false;
+    }
 
     SlotTriggerResult? trigger;
     if (withSlot) {
