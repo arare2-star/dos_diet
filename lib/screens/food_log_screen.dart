@@ -215,39 +215,6 @@ class FoodLogScreenState extends State<FoodLogScreen> {
                       ],
                     ),
                   ),
-                  // 品目ごとの内訳（分量→kcal）
-                  if (result.items.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    ...result.items.map(
-                      (item) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 1),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                item.amount.isEmpty
-                                    ? item.name
-                                    : '${item.name}（${item.amount}）',
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.nunito(
-                                  fontSize: 12,
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '${item.calories} kcal',
-                              style: GoogleFonts.nunito(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 8),
                   Text(
                     result.description,

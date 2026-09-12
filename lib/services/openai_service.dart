@@ -62,7 +62,7 @@ class OpenAIService {
     {"name": "品目名（日本語）", "amount": "分量（例: 200g, 180ml, 1個）", "calories": 整数kcal}
   ],
   "calories": 合計の整数kcal,
-  "description": "分量の根拠を含む簡単な説明（日本語、1〜2文）",
+  "description": "料理の簡単な説明（日本語、1文。分量やカロリーの根拠は書かない）",
   "confidence": "high/medium/low"
 }''';
 
