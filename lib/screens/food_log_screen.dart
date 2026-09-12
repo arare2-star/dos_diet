@@ -155,6 +155,7 @@ class FoodLogScreenState extends State<FoodLogScreen> {
             result.calories,
             mealGoal,
             selectedType,
+            items: result.items,
           );
           // カロリーバーの色：目標オーバーなら警告色
           final ratio = result.calories / mealGoal;

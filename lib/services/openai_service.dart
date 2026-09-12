@@ -167,7 +167,8 @@ class OpenAIService {
   }
 
   /// ぽんぽこコーチからのフィードバックを生成（1食 vs 食事別目標）
-  static PontaFeedback getPontaFeedback(int mealCalories, int mealGoal, String mealType) {
+  static PontaFeedback getPontaFeedback(int mealCalories, int mealGoal, String mealType,
+      {List<FoodItem> items = const []}) {
     final label = getMealLabel(mealType);
     final over = mealCalories - mealGoal;
     final under = mealGoal - mealCalories;
@@ -183,7 +184,7 @@ class OpenAIService {
         '${mealCalories}kcalは草ぽんwwwww\nもうダイエットやめたほうが早いんじゃないかぽん？？www',
         'え待って${mealCalories}kcalってマジぽん？wwww\n${over}kcalオーバーって清々しいくらい振り切れてるぽんwww',
       ];
-      return PontaFeedback(message: msgs[v]);
+      return PontaFeedback(message: msgs[v] + culpritLine(items, ratio, v));
 
     } else if (ratio >= 1.5) {
       // 目標の1.5倍以上：激怒
@@ -192,7 +193,7 @@ class OpenAIService {
         '${over}kcalオーバーwww\nぽんぽこ引いてるぽん…本当に痩せたいんかぽん？',
         'そのカロリー見て何も思わないぽん？w\n${label}${mealCalories}kcalはちょっとありえないぽん。反省するぽん。',
       ];
-      return PontaFeedback(message: msgs[v]);
+      return PontaFeedback(message: msgs[v] + culpritLine(items, ratio, v));
 
     } else if (ratio >= 1.2) {
       // 目標の1.2〜1.5倍：呆れ気味
@@ -201,7 +202,7 @@ class OpenAIService {
         'うーん${mealCalories}kcalかぽん…\n目標より${over}kcalはみ出てるぽん。惜しいような惜しくないようなw',
         'オーバーは×ぽん。でも${over}kcalくらいなら\n明日ちゃんとやれば帳消しにできるぽん。やれよぽんw',
       ];
-      return PontaFeedback(message: msgs[v]);
+      return PontaFeedback(message: msgs[v] + culpritLine(items, ratio, v));
 
     } else if (ratio > 1.0) {
       // 目標をちょいオーバー：ため息系
@@ -210,7 +211,7 @@ class OpenAIService {
         'ギリアウトぽん…w\nあと${over}kcal我慢できなかったぽん？惜しすぎるぽん。',
         'もうちょいだったのに〜ぽんw\n${over}kcalオーバー。次は絶対収めるぽん、いいかぽん？',
       ];
-      return PontaFeedback(message: msgs[v]);
+      return PontaFeedback(message: msgs[v] + culpritLine(items, ratio, v));
 
     } else if (ratio >= 0.8) {
       // 目標の8〜10割：合格
@@ -219,7 +220,7 @@ class OpenAIService {
         'おっ、ちゃんとやるじゃないかぽん。\n${label}${mealCalories}kcal、合格ぽん！この調子ぽん。',
         '悪くないぽん。\n目標${mealGoal}kcalに対して${mealCalories}kcalはセーフぽん。毎回これでいくぽん。',
       ];
-      return PontaFeedback(message: msgs[v]);
+      return PontaFeedback(message: msgs[v] + culpritLine(items, ratio, v));
 
     } else if (ratio >= 0.5) {
       // 目標の5〜8割：褒め
@@ -228,7 +229,7 @@ class OpenAIService {
         '${mealCalories}kcalはなかなかいいぽん！\nこれを毎回続けるぽん。逃げんなよぽんw',
         'いいじゃないかぽん〜！\n${label}${under}kcalも余ったぽん。ぽんぽこ的に合格以上ぽん👍',
       ];
-      return PontaFeedback(message: msgs[v]);
+      return PontaFeedback(message: msgs[v] + culpritLine(items, ratio, v));
 
     } else {
       // 目標の半分以下：少なすぎ注意
@@ -237,8 +238,29 @@ class OpenAIService {
         'え、それだけ？w\n栄養足りてるぽん？無理な食事制限は続かないぽんよ。',
         'ストイックすぎて逆に心配ぽん。\n${label}${mealCalories}kcalはさすがに少ないぽん。食べるべきものは食べるぽん。',
       ];
-      return PontaFeedback(message: msgs[v]);
+      return PontaFeedback(message: msgs[v] + culpritLine(items, ratio, v));
     }
+  }
+
+  /// 目標オーバー時に、一番カロリーの高い品目をぽんぽこが数字なしで指差す一言。
+  /// 内訳の数字は出さない方針（ユーザー指示）なので品目名だけ。該当しなければ空文字
+  static String culpritLine(List<FoodItem> items, double ratio, int v) {
+    if (ratio <= 1.0 || items.length < 2) return '';
+    final total = items.fold<int>(0, (sum, e) => sum + e.calories);
+    if (total <= 0) return '';
+    final top = items.reduce((a, b) => b.calories > a.calories ? b : a);
+    // 突出してない（3割未満）なら犯人扱いしない
+    if (top.calories * 10 < total * 3) return '';
+    // 「チキンカツ(チーズのせ)」→「チキンカツ」のように括弧以降を落として短くする
+    var name = top.name.split(RegExp(r'[（(]')).first.trim();
+    if (name.isEmpty) return '';
+    if (name.length > 12) name = name.substring(0, 12);
+    final lines = [
+      '\n犯人は${name}ぽん。',
+      '\n主犯は${name}ぽん。あいつが全部持ってったぽんw',
+      '\n${name}…お前だぽん。',
+    ];
+    return lines[v];
   }
 }
 
