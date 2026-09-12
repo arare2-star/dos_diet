@@ -54,10 +54,11 @@ class OpenAIService {
 - 揚げ物は衣が油を吸うため重量あたりのカロリーが高い（とんかつ・唐揚げ・チキン南蛮・天ぷらは100gあたり250〜300kcal）
 - タルタルソース・マヨネーズ・ドレッシング・甘酢だれ・カレールー・バターなどソース/油脂類は、かかっている量を見積もって必ず別品目として計上する（タルタル大さじ1杯≒100kcal）
 - 分量に迷ったら少なめでなく多めに見積もる。ダイエット用途なので過小評価の方が有害
+- 丼もの・カレー・オムライス・パスタ・ラーメンなど、主食（ご飯・麺）が具の下に隠れて写真に写らない料理でも、主食は必ず入っているものとして計上する（例: カツ丼ならご飯250g前後を必ず入れる）
 
 以下のJSONのみを返してください。説明文は不要です。
 {
-  "food_name": "食事全体の名前（日本語、短く。例: 鮭の塩焼き定食）",
+  "food_name": "食事全体の名前（日本語、短く。例: 鮭の塩焼き定食。括弧書きの注釈や補足は付けない）",
   "items": [
     {"name": "品目名（日本語）", "amount": "分量（例: 200g, 180ml, 1個）", "calories": 整数kcal}
   ],
@@ -81,12 +82,18 @@ class OpenAIService {
         ? items.fold<int>(0, (sum, e) => sum + e.calories)
         : (parsed['calories'] as num?)?.toInt() ?? 0;
     return CalorieResult(
-      foodName: parsed['food_name'] ?? '不明な食べ物',
+      // 「味噌カツ丼(カツのみ・ご飯は別)」のような注釈をモデルが付けてくることがあるので括弧書きは落とす
+      foodName: _stripNote((parsed['food_name'] ?? '').toString()),
       calories: _dejitterRound(total),
       description: parsed['description'] ?? '',
       confidence: parsed['confidence'] ?? 'low',
       items: items,
     );
+  }
+
+  static String _stripNote(String name) {
+    final cleaned = name.replaceAll(RegExp(r'[（(][^）)]*[）)]'), '').trim();
+    return cleaned.isEmpty ? '不明な食べ物' : cleaned;
   }
 
   /// 画像からカロリーを推測する
