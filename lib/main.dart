@@ -10,6 +10,7 @@ import 'services/subscription_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/food_log_screen.dart';
 import 'screens/stats_screen.dart';
+import 'screens/monthly_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/imashime_report_screen.dart';
 import 'widgets/mini_tanuki.dart';
@@ -130,6 +131,7 @@ class _MainScreenState extends State<MainScreen> {
   final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
   final GlobalKey<FoodLogScreenState> _foodLogKey = GlobalKey<FoodLogScreenState>();
   final GlobalKey<StatsScreenState> _statsKey = GlobalKey<StatsScreenState>();
+  final GlobalKey<MonthlyScreenState> _monthlyKey = GlobalKey<MonthlyScreenState>();
 
   late final List<Widget> _screens;
 
@@ -149,6 +151,10 @@ class _MainScreenState extends State<MainScreen> {
       ),
       StatsScreen(
         key: _statsKey,
+        storageService: widget.storageService,
+      ),
+      MonthlyScreen(
+        key: _monthlyKey,
         storageService: widget.storageService,
       ),
       SettingsScreen(
@@ -177,6 +183,9 @@ class _MainScreenState extends State<MainScreen> {
         break;
       case 2:
         _statsKey.currentState?.refresh();
+        break;
+      case 3:
+        _monthlyKey.currentState?.refresh();
         break;
     }
   }
@@ -230,6 +239,11 @@ class _MainScreenState extends State<MainScreen> {
               icon: Icon(Icons.bar_chart_outlined),
               activeIcon: Icon(Icons.bar_chart),
               label: '統計',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_month_outlined),
+              activeIcon: Icon(Icons.calendar_month),
+              label: '月記録',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.settings_outlined),

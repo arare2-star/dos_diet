@@ -277,16 +277,32 @@ class StatsScreenState extends State<StatsScreen> {
           const SizedBox(height: 20),
           SizedBox(
             height: 200,
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
+            child: LineChart(
+              LineChartData(
+                minY: 0,
                 maxY: maxCalories * 1.2,
-                barTouchData: BarTouchData(enabled: false),
+                minX: 0,
+                maxX: 6,
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipItems: (touchedSpots) => touchedSpots
+                        .map((spot) => LineTooltipItem(
+                              '${spot.y.toInt()} kcal',
+                              GoogleFonts.nunito(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                ),
                 titlesData: FlTitlesData(
                   show: true,
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
+                      interval: 1,
                       getTitlesWidget: (value, meta) {
                         final index = value.toInt();
                         if (index >= 0 && index < _weekDayLabels.length) {
@@ -312,24 +328,47 @@ class StatsScreenState extends State<StatsScreen> {
                   rightTitles: const AxisTitles(
                       sideTitles: SideTitles(showTitles: false)),
                 ),
-                gridData: const FlGridData(show: false),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: AppTheme.surface,
+                    strokeWidth: 1,
+                  ),
+                ),
                 borderData: FlBorderData(show: false),
-                barGroups: _weeklyCalories.asMap().entries.map((entry) {
-                  final isToday = entry.key == 6;
-                  return BarChartGroupData(
-                    x: entry.key,
-                    barRods: [
-                      BarChartRodData(
-                        toY: entry.value.toDouble(),
-                        color: isToday ? AppTheme.accent : AppTheme.primary,
-                        width: 24,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(8),
-                        ),
+                lineBarsData: [
+                  LineChartBarData(
+                    // 記録がない日は0に落とさず線を切る（食べてないのではなく未記録なので）
+                    spots: _weeklyCalories.asMap().entries.map((entry) {
+                      return entry.value > 0
+                          ? FlSpot(entry.key.toDouble(), entry.value.toDouble())
+                          : FlSpot.nullSpot;
+                    }).toList(),
+                    isCurved: true,
+                    preventCurveOverShooting: true,
+                    color: AppTheme.primary,
+                    barWidth: 3,
+                    isStrokeCapRound: true,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, barData, index) =>
+                          FlDotCirclePainter(
+                        radius: 5,
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                        // 今日だけアクセント色（棒グラフ時代と同じ扱い）
+                        strokeColor: spot.x.toInt() == 6
+                            ? AppTheme.accent
+                            : AppTheme.primary,
                       ),
-                    ],
-                  );
-                }).toList(),
+                    ),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: AppTheme.primary.withValues(alpha: 0.1),
+                    ),
+                  ),
+                ],
                 extraLinesData: ExtraLinesData(
                   horizontalLines: [
                     HorizontalLine(
